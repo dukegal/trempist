@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
+import os
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,15 @@ from app.schemas import (
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TREMPIST MVP API")
+
+CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS if CORS_ORIGINS else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def api_error(http_status: int, code: str, message: str):
@@ -137,6 +148,16 @@ def request_match(
         api_error(status.HTTP_400_BAD_REQUEST, "E004", "No seats available")
     if current_user.credits < 1:
         api_error(status.HTTP_400_BAD_REQUEST, "E003", "Not enough credits")
+    existing_request = db.scalar(
+        select(Match).where(
+            and_(
+                Match.ride_id == ride.id,
+                Match.passenger_id == current_user.id,
+            )
+        )
+    )
+    if existing_request:
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match request already exists")
 
     match = Match(ride_id=ride.id, passenger_id=current_user.id, confirmed_by_passenger=True)
     db.add(match)
@@ -183,6 +204,43 @@ def confirm_match(
 
     db.commit()
     return {"status": "CONFIRMED", "ride_id": ride.id}
+
+
+@app.get("/matches/my-requests")
+def my_match_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    requests = db.scalars(select(Match).where(Match.passenger_id == current_user.id).order_by(Match.id.desc())).all()
+    return [
+        {
+            "match_id": match.id,
+            "ride_id": match.ride_id,
+            "confirmed_by_driver": match.confirmed_by_driver,
+            "confirmed_by_passenger": match.confirmed_by_passenger,
+        }
+        for match in requests
+    ]
+
+
+@app.get("/matches/driver-pending")
+def driver_pending_matches(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    pending = db.scalars(
+        select(Match)
+        .join(Ride, Ride.id == Match.ride_id)
+        .where(
+            and_(
+                Ride.driver_id == current_user.id,
+                Match.confirmed_by_driver.is_(False),
+            )
+        )
+        .order_by(Match.id.desc())
+    ).all()
+    return [
+        {
+            "match_id": match.id,
+            "ride_id": match.ride_id,
+            "passenger_id": match.passenger_id,
+        }
+        for match in pending
+    ]
 
 
 @app.post("/ratings")
