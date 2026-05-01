@@ -21,6 +21,7 @@ function Icon({ name }) {
 
 function useGoogleMaps(apiKey) {
   const [loaded, setLoaded] = useState(Boolean(window.google?.maps?.places))
+  const [error, setError] = useState('')
   useEffect(() => {
     if (!apiKey) return
     if (window.google?.maps?.places) {
@@ -39,9 +40,10 @@ function useGoogleMaps(apiKey) {
     script.async = true
     script.defer = true
     script.onload = () => setLoaded(true)
+    script.onerror = () => setError('Google Maps failed to load. Check API key and domain restrictions.')
     document.body.appendChild(script)
   }, [apiKey])
-  return loaded
+  return { loaded, error }
 }
 
 function App() {
@@ -65,9 +67,10 @@ function App() {
   const [selectedDriverId, setSelectedDriverId] = useState(null)
   const [myRequests, setMyRequests] = useState([])
   const [driverPending, setDriverPending] = useState([])
+  const [myPublishedRides, setMyPublishedRides] = useState([])
 
   const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
-  const mapsLoaded = useGoogleMaps(mapsApiKey)
+  const { loaded: mapsLoaded, error: mapsError } = useGoogleMaps(mapsApiKey)
   const searchOriginRef = useRef(null)
   const searchDestinationRef = useRef(null)
   const rideOriginRef = useRef(null)
@@ -180,6 +183,8 @@ function App() {
       (result, status) => {
         if (status === 'OK' && result) {
           directionsRendererRef.current.setDirections(result)
+        } else if (status && status !== 'OK') {
+          setMessage(`Route draw failed (${status}). Verify Directions API is enabled.`)
         }
       },
     )
@@ -208,6 +213,7 @@ function App() {
   useEffect(() => {
     if (!mapsLoaded || !searchMapRef.current || activeTab !== 'discover') return
     if (!searchMapInstance.current) searchMapInstance.current = new window.google.maps.Map(searchMapRef.current, mapDefaults())
+    window.google.maps.event.trigger(searchMapInstance.current, 'resize')
     applyMarkers(searchMapInstance.current, searchMarkers, searchCoords)
     drawRoute(searchMapInstance.current, searchDirectionsService, searchDirectionsRenderer, searchCoords)
   }, [mapsLoaded, activeTab, searchCoords])
@@ -215,6 +221,7 @@ function App() {
   useEffect(() => {
     if (!mapsLoaded || !rideMapRef.current || activeTab !== 'manage') return
     if (!rideMapInstance.current) rideMapInstance.current = new window.google.maps.Map(rideMapRef.current, mapDefaults())
+    window.google.maps.event.trigger(rideMapInstance.current, 'resize')
     applyMarkers(rideMapInstance.current, rideMarkers, rideCoords)
     drawRoute(rideMapInstance.current, rideDirectionsService, rideDirectionsRenderer, rideCoords)
   }, [mapsLoaded, activeTab, rideCoords])
@@ -295,6 +302,18 @@ function App() {
         setSelectedDriverId(userId)
         setDriverRides(data)
         setMessage(`Loaded ${data.length} rides for user ${userId}`)
+      } catch (error) {
+        setMessage(error.message)
+      }
+    })
+  }
+
+  async function loadMyPublishedRides() {
+    await withLoading(async () => {
+      try {
+        const data = await callApi('/rides/mine', 'GET', null, true)
+        setMyPublishedRides(data)
+        setMessage(`Loaded ${data.length} rides you published`)
       } catch (error) {
         setMessage(error.message)
       }
@@ -469,6 +488,7 @@ function App() {
           </form>
           <div className="mapWrap">
             {!mapsApiKey ? <p className="empty">Add `VITE_GOOGLE_MAPS_API_KEY` to enable map and autocomplete.</p> : null}
+            {mapsError ? <p className="empty">{mapsError}</p> : null}
             <div ref={searchMapRef} className="mapCanvas" />
           </div>
           <ul className="results">
@@ -521,8 +541,25 @@ function App() {
             </form>
             <div className="mapWrap">
               {!mapsApiKey ? <p className="empty">Add `VITE_GOOGLE_MAPS_API_KEY` to enable map and autocomplete.</p> : null}
+              {mapsError ? <p className="empty">{mapsError}</p> : null}
               <div ref={rideMapRef} className="mapCanvas" />
             </div>
+          </section>
+          <section className="card">
+            <h2>My Published Rides</h2>
+            <button onClick={loadMyPublishedRides} disabled={!token || loading}>Load My Rides</button>
+            <ul className="results compact">
+              {myPublishedRides.map((item) => (
+                <li key={`mine-${item.id}`}>
+                  <div className="rideBlock">
+                    <strong>#{item.id}</strong>
+                    <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">to</span><span className="routeChip">{item.destination}</span></div>
+                    <div className="meta">Seats: {item.seats_available} / {item.seats_total}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!myPublishedRides.length ? <p className="empty">No rides published by you yet.</p> : null}
           </section>
           <section className="card">
             <h2>My Match Requests</h2>

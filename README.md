@@ -46,6 +46,7 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 - `GET /users/me`
 - `POST /rides`
 - `POST /rides/search`
+- `GET /rides/mine`
 - `GET /users/{user_id}/rides`
 - `POST /matches/request`
 - `POST /matches/confirm`
