@@ -23,6 +23,7 @@ function App() {
   const [message, setMessage] = useState('Welcome to TREMPIST')
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('discover')
+  const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [isRtl, setIsRtl] = useState(localStorage.getItem('rtl') === '1')
   const [auth, setAuth] = useState({ name: '', phone: '', email: '', password: '' })
@@ -68,10 +69,10 @@ function App() {
     event.preventDefault()
     await withLoading(async () => {
       try {
-        const data = await callApi('/auth/register', 'POST', auth)
-        localStorage.setItem('token', data.token)
-        setToken(data.token)
-        setMessage('Registered successfully')
+        await callApi('/auth/register', 'POST', auth)
+        setAuth({ name: '', phone: '', email: '', password: '' })
+        setAuthMode('login')
+        setMessage('Registered successfully. Please login.')
       } catch (error) {
         setMessage(error.message)
       }
@@ -210,6 +211,53 @@ function App() {
     pendingApprovals: driverPending.length,
   }
 
+  if (!token) {
+    return (
+      <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
+        <section className="authScreen">
+          <div className="authCard">
+            <h1>TREMPIST</h1>
+            <p className="sub">Sign in to access rides, matches, and profile.</p>
+            {message ? <p className="message">{message}</p> : null}
+
+            <div className="authSwitch">
+              <button
+                type="button"
+                className={authMode === 'login' ? 'tab active' : 'tab'}
+                onClick={() => setAuthMode('login')}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className={authMode === 'signup' ? 'tab active' : 'tab'}
+                onClick={() => setAuthMode('signup')}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {authMode === 'login' ? (
+              <form onSubmit={loginSubmit}>
+                <input type="email" placeholder="Email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
+                <input type="password" placeholder="Password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
+                <button type="submit" disabled={loading}>Login</button>
+              </form>
+            ) : (
+              <form onSubmit={registerSubmit}>
+                <input placeholder="Name" value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required />
+                <input placeholder="Phone" value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
+                <input type="email" placeholder="Email" value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
+                <input type="password" placeholder="Password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required />
+                <button type="submit" disabled={loading}>Create Account</button>
+              </form>
+            )}
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
       <header className="hero">
@@ -264,25 +312,8 @@ function App() {
       </section>
 
       <section className="card">
-        <h2>Auth</h2>
-        <div className="grid">
-          <form onSubmit={registerSubmit}>
-            <h3>Register</h3>
-            <input placeholder="Name" value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required />
-            <input placeholder="Phone" value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
-            <input type="email" placeholder="Email" value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
-            <input type="password" placeholder="Password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required />
-            <button type="submit" disabled={loading}>Register</button>
-          </form>
-
-          <form onSubmit={loginSubmit}>
-            <h3>Login</h3>
-            <input type="email" placeholder="Email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
-            <input type="password" placeholder="Password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
-            <button type="submit" disabled={loading}>Login</button>
-            <button type="button" onClick={logout} disabled={loading}>Logout</button>
-          </form>
-        </div>
+        <h2>Session</h2>
+        <button type="button" onClick={logout} disabled={loading}>Logout</button>
       </section>
 
       <section className="card">

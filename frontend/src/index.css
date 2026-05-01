@@ -22,6 +22,34 @@ body {
   padding: 24px 16px 40px;
 }
 
+.authScreen {
+  min-height: calc(100vh - 48px);
+  display: grid;
+  place-items: center;
+}
+
+.authCard {
+  width: 100%;
+  max-width: 460px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+}
+
+.theme-dark .authCard {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: #334155;
+}
+
+.authSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
 .theme-dark {
   color: #e2e8f0;
 }
