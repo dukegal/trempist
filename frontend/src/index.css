@@ -122,6 +122,53 @@ h1 {
   align-items: center;
 }
 
+.profileMenuWrap {
+  position: relative;
+}
+
+.iconOnly {
+  padding: 8px;
+  min-width: 38px;
+  justify-content: center;
+}
+
+.profileMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  padding: 8px;
+  z-index: 30;
+}
+
+.theme-dark .profileMenu {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.menuItem {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border-color: #dbeafe;
+}
+
+.menuMeta {
+  font-size: 0.82rem;
+  color: #64748b;
+  padding: 6px 10px;
+}
+
+.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
 .status {
   font-size: 0.8rem;
   font-weight: 600;
@@ -300,10 +347,32 @@ button:disabled {
   padding: 6px 10px;
 }
 
+.actionCol {
+  display: grid;
+  gap: 6px;
+}
+
 .meta {
   font-size: 0.82rem;
   color: #64748b;
   margin-top: 2px;
+}
+
+.subCard {
+  margin-top: 14px;
+  background: rgba(239, 246, 255, 0.5);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.theme-dark .subCard {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: #334155;
+}
+
+.results.compact li {
+  padding: 8px;
 }
 
 .empty {
@@ -405,5 +474,12 @@ button:disabled {
   }
   .results button {
     margin-left: 0;
+  }
+  .profileMenu {
+    right: auto;
+    left: 0;
+  }
+  .actionCol {
+    width: 100%;
   }
 }

@@ -133,6 +133,14 @@ def search_rides(payload: RideSearchIn, db: Session = Depends(get_db)):
     return rides
 
 
+@app.get("/users/{user_id}/rides", response_model=list[RideOut])
+def user_rides(user_id: int, db: Session = Depends(get_db)):
+    rides = db.scalars(
+        select(Ride).where(Ride.driver_id == user_id).order_by(Ride.departure_time.desc())
+    ).all()
+    return rides
+
+
 @app.post("/matches/request")
 def request_match(
     payload: MatchRequestIn,
