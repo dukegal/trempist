@@ -61,6 +61,7 @@ The `frontend` folder contains a React + Vite MVP connected to this backend.
 
    - Create `frontend/.env` with:
      - `VITE_API_BASE_URL=https://your-render-api.onrender.com`
+     - `VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key`
 
 2. Run frontend:
 
@@ -69,3 +70,11 @@ The `frontend` folder contains a React + Vite MVP connected to this backend.
    npm install
    npm run dev
    ```
+
+### Google Maps setup
+
+- In Google Cloud, enable:
+  - Maps JavaScript API
+  - Places API
+- Add your frontend domain (Render URL) to API key restrictions.
+- Set `VITE_GOOGLE_MAPS_API_KEY` in your frontend Render environment variables.

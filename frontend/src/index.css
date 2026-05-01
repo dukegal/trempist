@@ -312,6 +312,23 @@ button:disabled {
   margin: 6px 0 0;
 }
 
+.mapWrap {
+  margin-top: 12px;
+}
+
+.mapCanvas {
+  width: 100%;
+  height: 260px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.theme-dark .mapCanvas {
+  border-color: #334155;
+  background: #0f172a;
+}
+
 .rideBlock {
   display: grid;
   gap: 5px;
