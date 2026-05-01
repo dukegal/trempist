@@ -49,9 +49,14 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 - `GET /rides/mine`
 - `GET /users/{user_id}/rides`
 - `POST /matches/request`
-- `POST /matches/confirm`
+- `POST /matches/accept`
+- `POST /matches/reject`
+- `POST /matches/cancel`
+- `POST /matches/complete`
+- `POST /matches/confirm` (backward-compatible alias)
 - `GET /matches/my-requests`
 - `GET /matches/driver-pending`
+- `GET /matches/driver-active`
 - `POST /ratings`
 - `POST /admin/block/{user_id}`
 

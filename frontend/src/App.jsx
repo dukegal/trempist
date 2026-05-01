@@ -249,6 +249,7 @@ function App() {
         setToken(data.token)
         setMessage('Logged in')
         await loadProfile()
+        await loadMyPublishedRides()
       } catch (error) {
         setMessage(error.message)
       }
@@ -359,10 +360,34 @@ function App() {
   async function confirmMatch(matchId) {
     await withLoading(async () => {
       try {
-        await callApi('/matches/confirm', 'POST', { match_id: matchId }, true)
-        setMessage(`Match ${matchId} confirmed`)
+        await callApi('/matches/accept', 'POST', { match_id: matchId }, true)
+        setMessage(`Match ${matchId} accepted`)
         await loadDriverPending()
         await loadProfile()
+      } catch (error) {
+        setMessage(error.message)
+      }
+    })
+  }
+
+  async function rejectMatch(matchId) {
+    await withLoading(async () => {
+      try {
+        await callApi('/matches/reject', 'POST', { match_id: matchId }, true)
+        setMessage(`Match ${matchId} rejected`)
+        await loadDriverPending()
+      } catch (error) {
+        setMessage(error.message)
+      }
+    })
+  }
+
+  async function cancelMatch(matchId) {
+    await withLoading(async () => {
+      try {
+        await callApi('/matches/cancel', 'POST', { match_id: matchId }, true)
+        setMessage(`Match ${matchId} cancelled`)
+        await loadMyRequests()
       } catch (error) {
         setMessage(error.message)
       }
@@ -567,7 +592,10 @@ function App() {
             <ul className="results">
               {myRequests.map((item) => (
                 <li key={item.match_id}>
-                  <div><strong>Match #{item.match_id}</strong> for ride #{item.ride_id}<div className="meta">Driver confirmed: {item.confirmed_by_driver ? 'Yes' : 'No'}</div></div>
+                  <div><strong>Match #{item.match_id}</strong> for ride #{item.ride_id}<div className="meta">Status: {item.status}</div></div>
+                  {(item.status === 'PENDING' || item.status === 'ACCEPTED') ? (
+                    <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>Cancel</button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -584,7 +612,10 @@ function App() {
             {driverPending.map((item) => (
               <li key={item.match_id}>
                 <div><strong>Match #{item.match_id}</strong> for ride #{item.ride_id}<div className="meta">Passenger #{item.passenger_id}</div></div>
-                <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>Confirm</button>
+                <div className="actionCol">
+                  <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>Accept</button>
+                  <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>Reject</button>
+                </div>
               </li>
             ))}
           </ul>

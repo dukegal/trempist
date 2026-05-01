@@ -14,6 +14,15 @@ class RideStatus(str, Enum):
     CANCELED = "CANCELED"
 
 
+class MatchStatus(str, Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -54,6 +63,10 @@ class Match(Base):
     passenger_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     confirmed_by_driver: Mapped[bool] = mapped_column(Boolean, default=False)
     confirmed_by_passenger: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[MatchStatus] = mapped_column(SqlEnum(MatchStatus), default=MatchStatus.PENDING, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
