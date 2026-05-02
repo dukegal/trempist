@@ -326,15 +326,26 @@ def accept_match(
 def my_match_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     expire_stale_matches(db)
     requests = db.scalars(select(Match).where(Match.passenger_id == current_user.id).order_by(Match.id.desc())).all()
-    return [
-        {
-            "match_id": match.id,
-            "ride_id": match.ride_id,
-            "status": match.status,
-            "expires_at": match.expires_at.isoformat() if match.expires_at else None,
-        }
-        for match in requests
-    ]
+    result = []
+    for match in requests:
+        ride = db.get(Ride, match.ride_id)
+        driver = db.get(User, ride.driver_id) if ride else None
+        passenger = db.get(User, match.passenger_id)
+        result.append(
+            {
+                "match_id": match.id,
+                "ride_id": match.ride_id,
+                "status": match.status,
+                "expires_at": match.expires_at.isoformat() if match.expires_at else None,
+                "origin": ride.origin if ride else None,
+                "destination": ride.destination if ride else None,
+                "driver_id": ride.driver_id if ride else None,
+                "driver_name": driver.name if driver else None,
+                "passenger_id": match.passenger_id,
+                "passenger_name": passenger.name if passenger else None,
+            }
+        )
+    return result
 
 
 @app.get("/matches/driver-pending")
@@ -351,14 +362,24 @@ def driver_pending_matches(db: Session = Depends(get_db), current_user: User = D
         )
         .order_by(Match.id.desc())
     ).all()
-    return [
-        {
-            "match_id": match.id,
-            "ride_id": match.ride_id,
-            "passenger_id": match.passenger_id,
-        }
-        for match in pending
-    ]
+    result = []
+    for match in pending:
+        ride = db.get(Ride, match.ride_id)
+        passenger = db.get(User, match.passenger_id)
+        driver = db.get(User, ride.driver_id) if ride else None
+        result.append(
+            {
+                "match_id": match.id,
+                "ride_id": match.ride_id,
+                "passenger_id": match.passenger_id,
+                "passenger_name": passenger.name if passenger else None,
+                "driver_id": ride.driver_id if ride else None,
+                "driver_name": driver.name if driver else None,
+                "origin": ride.origin if ride else None,
+                "destination": ride.destination if ride else None,
+            }
+        )
+    return result
 
 
 @app.get("/matches/driver-active")

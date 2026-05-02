@@ -99,6 +99,9 @@ const he = {
   routeDrawErr: (s) => `שרטוט המסלול נכשל (${s}). ודאו ש-Directions API מופעל.`,
   matchLine: (mid, rid) => `התאמה מס׳ ${mid} · נסיעה מס׳ ${rid}`,
   matchLineDriver: (mid, rid, pid) => `התאמה מס׳ ${mid} · נסיעה מס׳ ${rid} · נוסע מס׳ ${pid}`,
+  routeLabel: 'מסלול',
+  driverNameLabel: 'נהג',
+  passengerNameLabel: 'נוסע',
 }
 
 function matchStatusHe(s) {
@@ -794,7 +797,15 @@ function App() {
             <ul className="results">
               {myRequests.map((item) => (
                 <li key={item.match_id}>
-                  <div><strong>{he.matchLine(item.match_id, item.ride_id)}</strong><div className="meta">{he.status}: {matchStatusHe(item.status)}</div></div>
+                  <div>
+                    <strong>{he.matchLine(item.match_id, item.ride_id)}</strong>
+                    <div className="meta">{he.status}: {matchStatusHe(item.status)}</div>
+                    {(item.origin && item.destination) ? (
+                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
+                    ) : null}
+                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
+                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                  </div>
                   {(item.status === 'PENDING' || item.status === 'ACCEPTED') ? (
                     <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>{he.cancelBtn}</button>
                   ) : null}
@@ -809,7 +820,14 @@ function App() {
             <ul className="results">
               {driverPending.map((item) => (
                 <li key={`incoming-${item.match_id}`}>
-                  <div><strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong></div>
+                  <div>
+                    <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
+                    {(item.origin && item.destination) ? (
+                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
+                    ) : null}
+                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
+                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                  </div>
                   <div className="actionCol">
                     <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
                     <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>{he.rejectBtn}</button>
@@ -829,7 +847,14 @@ function App() {
           <ul className="results">
             {driverPending.map((item) => (
               <li key={item.match_id}>
-                <div><strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong></div>
+                <div>
+                  <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
+                  {(item.origin && item.destination) ? (
+                    <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
+                  ) : null}
+                  <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
+                  <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                </div>
                 <div className="actionCol">
                   <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
                   <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>{he.rejectBtn}</button>
