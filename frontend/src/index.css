@@ -51,7 +51,121 @@ body {
 .container {
   max-width: 920px;
   margin: 0 auto;
-  padding: 20px 16px 48px;
+  padding: 14px 16px 40px;
+}
+
+/* Single top “dashboard” surface */
+.appSurface {
+  margin-top: 10px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(240, 252, 255, 0.92) 100%);
+}
+
+.theme-dark .appSurface {
+  background: linear-gradient(180deg, rgba(22, 48, 72, 0.95) 0%, rgba(15, 35, 55, 0.92) 100%);
+}
+
+.heroInSurface {
+  margin-bottom: 0 !important;
+  padding: 4px 2px 16px !important;
+  border-bottom: 1px solid rgba(30, 200, 255, 0.18);
+}
+
+.heroBrandCol {
+  min-width: 0;
+  flex: 1;
+}
+
+.heroActions {
+  flex-shrink: 0;
+}
+
+.statsInSurface {
+  margin-top: 0 !important;
+  padding: 14px 0 16px !important;
+  border-bottom: 1px solid rgba(30, 58, 82, 0.08);
+}
+
+.theme-dark .statsInSurface {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.tabsInSurface {
+  margin-top: 12px !important;
+  padding-top: 2px;
+  width: 100%;
+}
+
+.tabsInSurface .tab {
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.statsBar {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.statAccent {
+  background: linear-gradient(145deg, rgba(255, 224, 102, 0.35) 0%, rgba(30, 200, 255, 0.12) 100%) !important;
+  border-color: rgba(255, 193, 7, 0.35) !important;
+}
+
+.statAccent strong {
+  color: #0b5a73;
+  font-size: 1.5rem;
+}
+
+.theme-dark .statAccent strong {
+  color: #fff;
+}
+
+.messageBand {
+  margin-top: 14px;
+}
+
+.pageMeta {
+  margin: 6px 0 10px;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.pageMetaUrl {
+  display: inline-block;
+  max-width: min(100%, 520px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.card.cardPanel {
+  min-height: 200px;
+  position: relative;
+}
+
+.card.cardPanel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card.cardPanel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.45;
+  background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(30, 200, 255, 0.08) 0%, transparent 65%);
+}
+
+.theme-dark .card.cardPanel::before {
+  opacity: 0.6;
+  background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(30, 200, 255, 0.12) 0%, transparent 60%);
 }
 
 /* Brand row — logo + TREMPIST */
@@ -524,7 +638,6 @@ body {
 
 .statsBar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -555,7 +668,7 @@ body {
 }
 
 .card {
-  margin-top: 18px;
+  margin-top: 14px;
   background: var(--card);
   border: 2px solid var(--card-border);
   border-radius: var(--radius-lg);
@@ -867,7 +980,7 @@ button:disabled {
 
 @media (max-width: 760px) {
   .statsBar {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .hero {
     flex-direction: column;
@@ -893,5 +1006,11 @@ button:disabled {
   }
   .actionCol {
     width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .statsBar {
+    grid-template-columns: 1fr;
   }
 }

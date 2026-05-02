@@ -23,7 +23,7 @@ const he = {
   themeDark: 'מצב כהה',
   themeLight: 'מצב בהיר',
   profileMenu: 'הפרופיל שלי',
-  creditsShort: 'נקודות',
+  creditsShort: 'קרדיט',
   logout: 'התנתקות',
   connected: 'מחובר',
   guest: 'אורח',
@@ -35,11 +35,8 @@ const he = {
   tabDiscover: 'גלה',
   tabManage: 'חיפוש טרמפ',
   tabDriver: 'הצע טרמפ',
-  profileSnapshot: 'פרופיל',
   labelName: 'שם',
   labelEmail: 'אימייל',
-  labelCredits: 'נקודות זכות',
-  labelRating: 'דירוג',
   password: 'סיסמה',
   phone: 'טלפון',
   searchRidesTitle: 'חיפוש נסיעות',
@@ -203,11 +200,15 @@ function App() {
   }, [token])
 
   const rootClassName = `container theme-${theme} rtl`
-  const stats = {
-    ridesFound: rides.length,
-    myRequests: myRequests.length,
-    pendingApprovals: driverPending.length,
-  }
+  const stats = useMemo(
+    () => ({
+      ridesFound: rides.length,
+      myRequests: myRequests.length,
+      pendingApprovals: driverPending.length,
+      credits: me?.credits ?? null,
+    }),
+    [rides.length, myRequests.length, driverPending.length, me?.credits],
+  )
 
   function mapDefaults() {
     return { center: { lat: 32.0853, lng: 34.7818 }, zoom: 9, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }
@@ -634,64 +635,56 @@ function App() {
 
   return (
     <main className={rootClassName} dir="rtl">
-      <header className="hero">
-        <div>
-          <div className="brandBlock">
-            <img src="/logo.svg" alt="" className="brandLogo" width={56} height={56} />
-            <div className="brandText">
-              <h1 className="brandWordmark">{BRAND}</h1>
-              <p className="sub">{he.tagline}</p>
+      <section className="card appSurface">
+        <header className="hero heroInSurface">
+          <div className="heroBrandCol">
+            <div className="brandBlock">
+              <img src="/logo.svg" alt="" className="brandLogo" width={56} height={56} />
+              <div className="brandText">
+                <h1 className="brandWordmark">{BRAND}</h1>
+                <p className="sub">{he.tagline}</p>
+              </div>
             </div>
           </div>
-          <p className="api">{he.apiLabel}: {API_BASE_URL}</p>
-        </div>
-        <div className="statusWrap controls">
-          <button type="button" className="iconBtn ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? he.themeDark : he.themeLight}</button>
-          <div className="profileMenuWrap">
-            <button type="button" className="iconBtn ghost iconOnly" onClick={() => setMenuOpen((prev) => !prev)}><Icon name="user" /></button>
-            {menuOpen ? (
-              <div className="profileMenu">
-                <button type="button" className="menuItem" onClick={() => withLoading(loadProfile)}>{he.profileMenu}</button>
-                {me ? <div className="menuMeta">{me.name} · {he.creditsShort}: {me.credits}</div> : null}
-                <button type="button" className="menuItem danger" onClick={logout}>{he.logout}</button>
-              </div>
-            ) : null}
+          <div className="statusWrap controls heroActions">
+            <button type="button" className="iconBtn ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? he.themeDark : he.themeLight}</button>
+            <div className="profileMenuWrap">
+              <button type="button" className="iconBtn ghost iconOnly" onClick={() => setMenuOpen((prev) => !prev)}><Icon name="user" /></button>
+              {menuOpen ? (
+                <div className="profileMenu">
+                  <button type="button" className="menuItem" onClick={() => withLoading(loadProfile)}>{he.profileMenu}</button>
+                  {me ? <div className="menuMeta">{he.creditsShort}: <strong>{me.credits}</strong></div> : null}
+                  <button type="button" className="menuItem danger" onClick={logout}>{he.logout}</button>
+                </div>
+              ) : null}
+            </div>
+            <span className={`status ${token ? 'ok' : 'off'} statusUser`}>
+              {token ? (me?.name ? `${he.connected} · ${me.name}` : he.connected) : he.guest}
+            </span>
+            <span className={`status ${loading ? 'busy' : 'ok'}`}>{loading ? he.loading : he.ready}</span>
           </div>
-          <span className={`status ${token ? 'ok' : 'off'} statusUser`}>
-            {token ? (me?.name ? `${he.connected} · ${me.name}` : he.connected) : he.guest}
-          </span>
-          <span className={`status ${loading ? 'busy' : 'ok'}`}>{loading ? he.loading : he.ready}</span>
+        </header>
+
+        <div className="statsBar statsInSurface">
+          <div className="stat"><span>{he.ridesFound}</span><strong>{stats.ridesFound}</strong></div>
+          <div className="stat"><span>{he.myRequestsStat}</span><strong>{stats.myRequests}</strong></div>
+          <div className="stat"><span>{he.pendingApprovals}</span><strong>{stats.pendingApprovals}</strong></div>
+          <div className="stat statAccent"><span>{he.creditsShort}</span><strong>{stats.credits !== null ? stats.credits : '—'}</strong></div>
         </div>
-      </header>
 
-      {message ? <p className="message">{message}</p> : null}
-
-      <section className="card statsBar">
-        <div className="stat"><span>{he.ridesFound}</span><strong>{stats.ridesFound}</strong></div>
-        <div className="stat"><span>{he.myRequestsStat}</span><strong>{stats.myRequests}</strong></div>
-        <div className="stat"><span>{he.pendingApprovals}</span><strong>{stats.pendingApprovals}</strong></div>
+        <nav className="tabs tabsInSurface" aria-label="ניווט ראשי">
+          <button className={activeTab === 'discover' ? 'tab active' : 'tab'} onClick={() => setActiveTab('discover')} type="button"><Icon name="discover" />{he.tabDiscover}</button>
+          <button className={activeTab === 'manage' ? 'tab active' : 'tab'} onClick={() => setActiveTab('manage')} type="button"><Icon name="manage" />{he.tabManage}</button>
+          <button className={activeTab === 'driver' ? 'tab active' : 'tab'} onClick={() => setActiveTab('driver')} type="button"><Icon name="driver" />{he.tabDriver}</button>
+        </nav>
       </section>
 
-      <section className="card tabs">
-        <button className={activeTab === 'discover' ? 'tab active' : 'tab'} onClick={() => setActiveTab('discover')} type="button"><Icon name="discover" />{he.tabDiscover}</button>
-        <button className={activeTab === 'manage' ? 'tab active' : 'tab'} onClick={() => setActiveTab('manage')} type="button"><Icon name="manage" />{he.tabManage}</button>
-        <button className={activeTab === 'driver' ? 'tab active' : 'tab'} onClick={() => setActiveTab('driver')} type="button"><Icon name="driver" />{he.tabDriver}</button>
-      </section>
+      {message ? <p className="message messageBand">{message}</p> : null}
 
-      {me ? (
-        <section className="card">
-          <h2>{he.profileSnapshot}</h2>
-          <div className="profileGrid">
-            <div className="pill"><span>{he.labelName}</span><strong>{me.name}</strong></div>
-            <div className="pill"><span>{he.labelEmail}</span><strong>{me.email}</strong></div>
-            <div className="pill"><span>{he.labelCredits}</span><strong>{me.credits}</strong></div>
-            <div className="pill"><span>{he.labelRating}</span><strong>{me.rating_avg}</strong></div>
-          </div>
-        </section>
-      ) : null}
+      <p className="pageMeta" title={API_BASE_URL}>{he.apiLabel}: <span className="pageMetaUrl">{API_BASE_URL}</span></p>
 
       {activeTab === 'discover' ? (
-        <section className="card">
+        <section className="card cardPanel">
           <h2>{he.searchRidesTitle}</h2>
           <form onSubmit={searchRides}>
             <input ref={searchOriginRef} placeholder={mapsLoaded ? he.originPh : he.originPhShort} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
@@ -743,7 +736,7 @@ function App() {
 
       {activeTab === 'manage' ? (
         <>
-          <section className="card">
+          <section className="card cardPanel">
             <h2>{he.publishTitle}</h2>
             <form onSubmit={publishRide}>
               <input ref={rideOriginRef} placeholder={mapsLoaded ? he.originPubPh : he.originPubShort} value={ride.origin} onChange={(e) => { setRide({ ...ride, origin: e.target.value }); setRideCoords((prev) => ({ ...prev, origin: null })) }} required />
@@ -758,7 +751,7 @@ function App() {
               <div ref={rideMapRef} className="mapCanvas" />
             </div>
           </section>
-          <section className="card">
+          <section className="card cardPanel">
             <h2>{he.myRidesTitle}</h2>
             <button onClick={loadMyPublishedRides} disabled={!token || loading}>{he.loadMyRides}</button>
             <ul className="results compact">
@@ -777,7 +770,7 @@ function App() {
             </ul>
             {!myPublishedRides.length ? <p className="empty">{he.emptyMyRides}</p> : null}
           </section>
-          <section className="card">
+          <section className="card cardPanel">
             <h2>{he.myMatchesTitle}</h2>
             <button onClick={loadMyRequests} disabled={!token || loading}>{he.loadMyRequests}</button>
             <ul className="results">
@@ -796,7 +789,7 @@ function App() {
       ) : null}
 
       {activeTab === 'driver' ? (
-        <section className="card">
+        <section className="card cardPanel">
           <h2>{he.driverPendingTitle}</h2>
           <button onClick={loadDriverPending} disabled={!token || loading}>{he.loadPending}</button>
           <ul className="results">
