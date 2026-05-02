@@ -8,7 +8,12 @@ const he = {
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
   welcome: 'ברוכים הבאים',
-  authSubtitle: 'התחברו כדי לחפש נסיעות, לנהל התאמות ולצפות בפרופיל.',
+  authSubtitle: 'התחברו או הירשמו — ותתחילו לשתף טרמפים תוך שניות.',
+  authBullet1: 'חיפוש נסיעות לפי מוצא ויעד על המפה',
+  authBullet2: 'פרסום מקום פנוי ברכב בקלות',
+  authBullet3: 'התאמה מהירה בין נוסעים לנהגים',
+  signupLead: 'יצירת חשבון חדש',
+  loginLead: 'כניסה לחשבון קיים',
   loginTab: 'התחברות',
   signupTab: 'הרשמה',
   loginBtn: 'התחבר',
@@ -77,6 +82,7 @@ const he = {
   emptyPending: 'אין בקשות ממתינות לאישור.',
   deleteConfirm: 'למחוק את הנסיעה? בקשות ההתאמה הממתינות אליה יימחקו.',
   regOk: 'נרשמת בהצלחה. אפשר להתחבר.',
+  welcomeAfterRegister: (name) => `שלום ${name}! נרשמת והתחברת בהצלחה.`,
   loggedIn: 'התחברת בהצלחה',
   profileLoaded: 'הפרופיל נטען',
   ridePublished: 'הנסיעה פורסמה',
@@ -191,8 +197,9 @@ function App() {
   const rideDirectionsService = useRef(null)
 
   const headers = useMemo(() => {
-    if (!token) return { 'Content-Type': 'application/json' }
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    const t = token || localStorage.getItem('token')
+    if (!t) return { 'Content-Type': 'application/json' }
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }
   }, [token])
 
   const rootClassName = `container theme-${theme} rtl`
@@ -216,9 +223,16 @@ function App() {
   }
 
   async function callApi(path, method = 'GET', body = null, useAuth = false) {
+    const authToken = localStorage.getItem('token') || token
+    const requestHeaders = useAuth
+      ? {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        }
+      : { 'Content-Type': 'application/json' }
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: useAuth ? headers : { 'Content-Type': 'application/json' },
+      headers: requestHeaders,
       body: body ? JSON.stringify(body) : null,
     })
     const data = await response.json().catch(() => ({}))
@@ -294,6 +308,11 @@ function App() {
   }
 
   useEffect(() => {
+    if (!token || me) return
+    loadProfile({ quiet: true }).catch(() => {})
+  }, [token, me])
+
+  useEffect(() => {
     if (!mapsLoaded) return
     bindAutocomplete(
       searchOriginRef.current,
@@ -339,12 +358,16 @@ function App() {
 
   async function registerSubmit(event) {
     event.preventDefault()
+    const displayName = auth.name.trim()
     await withLoading(async () => {
       try {
-        await callApi('/auth/register', 'POST', auth)
+        const data = await callApi('/auth/register', 'POST', auth)
+        localStorage.setItem('token', data.token)
         setAuth({ name: '', phone: '', email: '', password: '' })
-        setAuthMode('login')
-        setMessage(he.regOk)
+        setMe(null)
+        setToken(data.token)
+        setMessage(he.welcomeAfterRegister(displayName))
+        await loadMyPublishedRides()
       } catch (error) {
         setMessage(error.message)
       }
@@ -358,8 +381,8 @@ function App() {
         const data = await callApi('/auth/login', 'POST', login)
         localStorage.setItem('token', data.token)
         setToken(data.token)
+        setMe(null)
         setMessage(he.loggedIn)
-        await loadProfile()
         await loadMyPublishedRides()
       } catch (error) {
         setMessage(error.message)
@@ -367,13 +390,15 @@ function App() {
     })
   }
 
-  async function loadProfile() {
+  async function loadProfile(options = {}) {
     try {
       const data = await callApi('/users/me', 'GET', null, true)
       setMe(data)
-      setMessage(he.profileLoaded)
+      if (!options.quiet) setMessage(he.profileLoaded)
+      return data
     } catch (error) {
-      setMessage(error.message)
+      if (!options.quiet) setMessage(error.message)
+      return null
     }
   }
 
@@ -544,34 +569,63 @@ function App() {
     return (
       <main className={rootClassName} dir="rtl">
         <section className="authScreen">
-          <div className="authCard">
-            <div className="brandBlock">
-              <img src="/logo.svg" alt="" className="brandLogo" width={52} height={52} />
-              <div className="brandText">
-                <h1 className="brandWordmark">{BRAND}</h1>
+          <div className="authDecor" aria-hidden="true" />
+          <div className="authShell">
+            <aside className="authHero">
+              <div className="authHeroGlow" aria-hidden="true" />
+              <img src="/logo.svg" alt="" className="authHeroLogo" width={72} height={72} />
+              <p className="authHeroEyebrow">{BRAND}</p>
+              <h2 className="authHeroTitle">{he.tagline}</h2>
+              <ul className="authHeroList">
+                <li><span className="authHeroCheck" aria-hidden="true" />{he.authBullet1}</li>
+                <li><span className="authHeroCheck" aria-hidden="true" />{he.authBullet2}</li>
+                <li><span className="authHeroCheck" aria-hidden="true" />{he.authBullet3}</li>
+              </ul>
+            </aside>
+            <div className="authPanel">
+              <div className="authPanelCard">
+                <p className="authPanelLead">{authMode === 'login' ? he.loginLead : he.signupLead}</p>
+                <p className="authPanelSub">{he.authSubtitle}</p>
+                {message ? <p className="message authMessage">{message}</p> : null}
+                <div className="authSwitch">
+                  <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
+                  <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>{he.signupTab}</button>
+                </div>
+                {authMode === 'login' ? (
+                  <form className="authForm" onSubmit={loginSubmit}>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelEmail}</span>
+                      <input type="email" autoComplete="email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.password}</span>
+                      <input type="password" autoComplete="current-password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
+                    </label>
+                    <button type="submit" className="authSubmit" disabled={loading}>{he.loginBtn}</button>
+                  </form>
+                ) : (
+                  <form className="authForm" onSubmit={registerSubmit}>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelName}</span>
+                      <input autoComplete="name" value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required minLength={2} />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.phone}</span>
+                      <input type="tel" autoComplete="tel" value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelEmail}</span>
+                      <input type="email" autoComplete="email" value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.password}</span>
+                      <input type="password" autoComplete="new-password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required minLength={6} />
+                    </label>
+                    <button type="submit" className="authSubmit" disabled={loading}>{he.createAccount}</button>
+                  </form>
+                )}
               </div>
             </div>
-            <p className="sub">{he.authSubtitle}</p>
-            {message ? <p className="message">{message}</p> : null}
-            <div className="authSwitch">
-              <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
-              <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>{he.signupTab}</button>
-            </div>
-            {authMode === 'login' ? (
-              <form onSubmit={loginSubmit}>
-                <input type="email" placeholder={he.labelEmail} value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
-                <input type="password" placeholder={he.password} value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
-                <button type="submit" disabled={loading}>{he.loginBtn}</button>
-              </form>
-            ) : (
-              <form onSubmit={registerSubmit}>
-                <input placeholder={he.labelName} value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required />
-                <input placeholder={he.phone} value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
-                <input type="email" placeholder={he.labelEmail} value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
-                <input type="password" placeholder={he.password} value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required />
-                <button type="submit" disabled={loading}>{he.createAccount}</button>
-              </form>
-            )}
           </div>
         </section>
       </main>
@@ -603,7 +657,9 @@ function App() {
               </div>
             ) : null}
           </div>
-          <span className={`status ${token ? 'ok' : 'off'}`}>{token ? he.connected : he.guest}</span>
+          <span className={`status ${token ? 'ok' : 'off'} statusUser`}>
+            {token ? (me?.name ? `${he.connected} · ${me.name}` : he.connected) : he.guest}
+          </span>
           <span className={`status ${loading ? 'busy' : 'ok'}`}>{loading ? he.loading : he.ready}</span>
         </div>
       </header>
