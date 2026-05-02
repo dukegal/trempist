@@ -208,7 +208,21 @@ def search_rides(payload: RideSearchIn, db: Session = Depends(get_db)):
     ]
     if not _destination_is_any(payload.destination):
         filters.append(_location_matches_column(Ride.destination, payload.destination))
-    rides = db.scalars(select(Ride).where(and_(*filters))).all()
+    if payload.departure_from:
+        filters.append(Ride.departure_time >= payload.departure_from)
+    if payload.departure_to:
+        filters.append(Ride.departure_time <= payload.departure_to)
+    if payload.leaving_soon_hours:
+        filters.append(Ride.departure_time <= datetime.utcnow() + timedelta(hours=payload.leaving_soon_hours))
+    sort_key = (payload.sort_by or "departure_asc").strip().lower()
+    sort_map = {
+        "departure_desc": Ride.departure_time.desc(),
+        "seats_desc": Ride.seats_available.desc(),
+        "seats_asc": Ride.seats_available.asc(),
+        "departure_asc": Ride.departure_time.asc(),
+    }
+    order_by_clause = sort_map.get(sort_key, Ride.departure_time.asc())
+    rides = db.scalars(select(Ride).where(and_(*filters)).order_by(order_by_clause)).all()
     return rides
 
 
@@ -395,7 +409,41 @@ def driver_active_matches(db: Session = Depends(get_db), current_user: User = De
         )
         .order_by(Match.id.desc())
     ).all()
-    return [{"match_id": match.id, "ride_id": match.ride_id, "passenger_id": match.passenger_id} for match in active]
+    result = []
+    for match in active:
+        ride = db.get(Ride, match.ride_id)
+        passenger = db.get(User, match.passenger_id)
+        driver = db.get(User, ride.driver_id) if ride else None
+        result.append(
+            {
+                "match_id": match.id,
+                "ride_id": match.ride_id,
+                "passenger_id": match.passenger_id,
+                "passenger_name": passenger.name if passenger else None,
+                "driver_id": ride.driver_id if ride else None,
+                "driver_name": driver.name if driver else None,
+                "origin": ride.origin if ride else None,
+                "destination": ride.destination if ride else None,
+                "status": match.status,
+            }
+        )
+    return result
+
+
+@app.get("/credits/me-logs")
+def my_credits_log(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    logs = db.scalars(
+        select(CreditsLog).where(CreditsLog.user_id == current_user.id).order_by(CreditsLog.created_at.desc()).limit(50)
+    ).all()
+    return [
+        {
+            "id": row.id,
+            "delta": row.delta,
+            "reason": row.reason,
+            "created_at": row.created_at.isoformat(),
+        }
+        for row in logs
+    ]
 
 
 @app.post("/matches/reject")

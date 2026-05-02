@@ -29,7 +29,7 @@ const he = {
   guest: 'אורח',
   loading: 'טוען',
   ready: 'מוכן',
-  ridesFound: 'נסיעות בתוצאות',
+  ridesFound: 'נסיעות שנמצאו',
   myRequestsStat: 'הבקשות שלי',
   pendingApprovals: 'ממתינים לאישור',
   tabDiscover: 'חפש טרמפ',
@@ -45,6 +45,14 @@ const he = {
   destPh: 'יעד, «כל היעדים», או ריק לכל היעדים',
   destPhShort: 'יעד או כל היעדים',
   searchBtn: 'חיפוש',
+  departureFrom: 'החל מתאריך ושעה',
+  departureTo: 'עד תאריך ושעה',
+  leavingSoonHours: 'יוצא בקרוב (שעות)',
+  sortBy: 'מיון',
+  sortDepartureAsc: 'שעת יציאה (מוקדם למאוחר)',
+  sortDepartureDesc: 'שעת יציאה (מאוחר למוקדם)',
+  sortSeatsDesc: 'מקומות פנויים (הרבה לפחות)',
+  sortSeatsAsc: 'מקומות פנויים (מעט לפחות)',
   searchHint:
     'אפשר להזין רק שם עיר. ביעד השאירו ריק או הזינו «כל» / Any כדי לראות נסיעות לכל היעדים.',
   mapsKeyHint: 'הוסיפו VITE_GOOGLE_MAPS_API_KEY כדי להפעיל מפה והשלמה אוטומטית.',
@@ -79,6 +87,14 @@ const he = {
   emptyPending: 'אין בקשות ממתינות לאישור.',
   incomingRequestsTitle: 'בקשות נכנסות לטרמפים שלי',
   noIncomingRequests: 'כרגע אין בקשות נכנסות.',
+  activeDriverRidesTitle: 'נסיעות פעילות שלי (מאושר)',
+  noActiveDriverRides: 'אין נסיעות פעילות כרגע.',
+  completeRideBtn: 'סמן כהושלם',
+  walletTitle: 'ארנק קרדיט',
+  loadWallet: 'רענן ארנק',
+  emptyWallet: 'אין תנועות קרדיט עדיין.',
+  notificationsTitle: 'התראות',
+  noNotifications: 'אין התראות חדשות.',
   deleteConfirm: 'למחוק את הנסיעה? בקשות ההתאמה הממתינות אליה יימחקו.',
   regOk: 'נרשמת בהצלחה. אפשר להתחבר.',
   welcomeAfterRegister: (name) => `שלום ${name}! נרשמת והתחברת בהצלחה.`,
@@ -102,6 +118,9 @@ const he = {
   routeLabel: 'מסלול',
   driverNameLabel: 'נהג',
   passengerNameLabel: 'נוסע',
+  creditIn: 'זיכוי',
+  creditOut: 'חיוב',
+  atTime: (iso) => `בתאריך ${new Date(iso).toLocaleString('he-IL')}`,
 }
 
 function matchStatusHe(s) {
@@ -170,7 +189,14 @@ function App() {
   const [auth, setAuth] = useState({ name: '', phone: '', email: '', password: '' })
   const [login, setLogin] = useState({ email: '', password: '' })
   const [ride, setRide] = useState({ origin: '', destination: '', departure_time: '', seats_total: 1 })
-  const [search, setSearch] = useState({ origin: '', destination: '' })
+  const [search, setSearch] = useState({
+    origin: '',
+    destination: '',
+    departure_from: '',
+    departure_to: '',
+    leaving_soon_hours: '',
+    sort_by: 'departure_asc',
+  })
   const [rideCoords, setRideCoords] = useState({ origin: null, destination: null })
   const [searchCoords, setSearchCoords] = useState({ origin: null, destination: null })
   const [me, setMe] = useState(null)
@@ -180,6 +206,9 @@ function App() {
   const [myRequests, setMyRequests] = useState([])
   const [driverPending, setDriverPending] = useState([])
   const [myPublishedRides, setMyPublishedRides] = useState([])
+  const [driverActive, setDriverActive] = useState([])
+  const [creditsLog, setCreditsLog] = useState([])
+  const [notifications, setNotifications] = useState([])
 
   const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   const { loaded: mapsLoaded, error: mapsError } = useGoogleMaps(mapsApiKey)
@@ -217,6 +246,11 @@ function App() {
 
   function mapDefaults() {
     return { center: { lat: 32.0853, lng: 34.7818 }, zoom: 9, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }
+  }
+
+  function pushNotification(text) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setNotifications((prev) => [{ id, text, createdAt: new Date().toISOString() }, ...prev].slice(0, 20))
   }
 
   async function withLoading(action) {
@@ -322,6 +356,8 @@ function App() {
     if (!token) return
     loadMyRequests({ quiet: true }).catch(() => {})
     loadDriverPending({ quiet: true }).catch(() => {})
+    loadDriverActive({ quiet: true }).catch(() => {})
+    loadCreditsLog({ quiet: true }).catch(() => {})
   }, [token])
 
   useEffect(() => {
@@ -329,6 +365,16 @@ function App() {
     if (activeTab === 'driver') loadDriverPending({ quiet: true }).catch(() => {})
     if (activeTab === 'manage') loadMyRequests({ quiet: true }).catch(() => {})
   }, [activeTab, token])
+
+  useEffect(() => {
+    if (!token) return
+    const timer = window.setInterval(() => {
+      loadMyRequests({ quiet: true }).catch(() => {})
+      loadDriverPending({ quiet: true }).catch(() => {})
+      loadDriverActive({ quiet: true }).catch(() => {})
+    }, 20000)
+    return () => window.clearInterval(timer)
+  }, [token])
 
   useEffect(() => {
     if (!mapsLoaded) return
@@ -442,6 +488,10 @@ function App() {
         const payload = {
           origin: search.origin.trim(),
           destination: search.destination.trim(),
+          departure_from: search.departure_from ? new Date(search.departure_from).toISOString() : null,
+          departure_to: search.departure_to ? new Date(search.departure_to).toISOString() : null,
+          leaving_soon_hours: search.leaving_soon_hours ? Number(search.leaving_soon_hours) : null,
+          sort_by: search.sort_by || 'departure_asc',
         }
         const data = await callApi('/rides/search', 'POST', payload)
         setRides(data)
@@ -497,6 +547,7 @@ function App() {
       try {
         const data = await callApi('/matches/request', 'POST', { ride_id: rideId }, true)
         setMessage(he.matchReq(data.match_id))
+        pushNotification(he.matchReq(data.match_id))
         await loadMyRequests({ quiet: true })
       } catch (error) {
         setMessage(error.message)
@@ -532,12 +583,55 @@ function App() {
     })
   }
 
+  async function loadDriverActive(options = {}) {
+    const { quiet = false } = options
+    const runner = quiet ? async (action) => action() : withLoading
+    await runner(async () => {
+      try {
+        const data = await callApi('/matches/driver-active', 'GET', null, true)
+        setDriverActive(data)
+      } catch (error) {
+        if (!quiet) setMessage(error.message)
+      }
+    })
+  }
+
+  async function loadCreditsLog(options = {}) {
+    const { quiet = false } = options
+    const runner = quiet ? async (action) => action() : withLoading
+    await runner(async () => {
+      try {
+        const data = await callApi('/credits/me-logs', 'GET', null, true)
+        setCreditsLog(data)
+      } catch (error) {
+        if (!quiet) setMessage(error.message)
+      }
+    })
+  }
+
+  async function completeRide(matchId) {
+    await withLoading(async () => {
+      try {
+        await callApi('/matches/complete', 'POST', { match_id: matchId }, true)
+        pushNotification(`ההתאמה ${matchId} הושלמה`)
+        await loadDriverActive({ quiet: true })
+        await loadDriverPending({ quiet: true })
+        await loadCreditsLog({ quiet: true })
+        await loadProfile({ quiet: true })
+      } catch (error) {
+        setMessage(error.message)
+      }
+    })
+  }
+
   async function confirmMatch(matchId) {
     await withLoading(async () => {
       try {
         await callApi('/matches/accept', 'POST', { match_id: matchId }, true)
         setMessage(he.matchAccepted(matchId))
+        pushNotification(he.matchAccepted(matchId))
         await loadDriverPending()
+        await loadDriverActive({ quiet: true })
         await loadProfile()
       } catch (error) {
         setMessage(error.message)
@@ -550,6 +644,7 @@ function App() {
       try {
         await callApi('/matches/reject', 'POST', { match_id: matchId }, true)
         setMessage(he.matchRejected(matchId))
+        pushNotification(he.matchRejected(matchId))
         await loadDriverPending()
       } catch (error) {
         setMessage(error.message)
@@ -562,6 +657,7 @@ function App() {
       try {
         await callApi('/matches/cancel', 'POST', { match_id: matchId }, true)
         setMessage(he.matchCancelled(matchId))
+        pushNotification(he.matchCancelled(matchId))
         await loadMyRequests()
       } catch (error) {
         setMessage(error.message)
@@ -576,6 +672,9 @@ function App() {
     setMe(null)
     setMyRequests([])
     setDriverPending([])
+    setDriverActive([])
+    setCreditsLog([])
+    setNotifications([])
     setDriverRides([])
     setSelectedDriverId(null)
     setMessage(he.loggedOut)
@@ -710,6 +809,15 @@ function App() {
           <form onSubmit={searchRides}>
             <input ref={searchOriginRef} placeholder={mapsLoaded ? he.originPh : he.originPhShort} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
             <input ref={searchDestinationRef} placeholder={mapsLoaded ? he.destPh : he.destPhShort} value={search.destination} onChange={(e) => { setSearch({ ...search, destination: e.target.value }); setSearchCoords((prev) => ({ ...prev, destination: null })) }} />
+            <input type="datetime-local" value={search.departure_from} onChange={(e) => setSearch({ ...search, departure_from: e.target.value })} placeholder={he.departureFrom} />
+            <input type="datetime-local" value={search.departure_to} onChange={(e) => setSearch({ ...search, departure_to: e.target.value })} placeholder={he.departureTo} />
+            <input type="number" min="1" max="72" value={search.leaving_soon_hours} onChange={(e) => setSearch({ ...search, leaving_soon_hours: e.target.value })} placeholder={he.leavingSoonHours} />
+            <select value={search.sort_by} onChange={(e) => setSearch({ ...search, sort_by: e.target.value })}>
+              <option value="departure_asc">{he.sortDepartureAsc}</option>
+              <option value="departure_desc">{he.sortDepartureDesc}</option>
+              <option value="seats_desc">{he.sortSeatsDesc}</option>
+              <option value="seats_asc">{he.sortSeatsAsc}</option>
+            </select>
             <button type="submit" disabled={loading}>{he.searchBtn}</button>
           </form>
           <p className="empty" style={{ marginTop: '0.5rem' }}>{he.searchHint}</p>
@@ -841,6 +949,58 @@ function App() {
               ))}
             </ul>
             {!driverPending.length ? <p className="empty">{he.noIncomingRequests}</p> : null}
+          </section>
+          <section className="card cardPanel">
+            <h2>{he.activeDriverRidesTitle}</h2>
+            <button onClick={() => loadDriverActive()} disabled={!token || loading}>{he.loadPending}</button>
+            <ul className="results">
+              {driverActive.map((item) => (
+                <li key={`active-${item.match_id}`}>
+                  <div>
+                    <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
+                    {(item.origin && item.destination) ? (
+                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
+                    ) : null}
+                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
+                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                  </div>
+                  <div className="actionCol">
+                    <button type="button" onClick={() => completeRide(item.match_id)} disabled={loading}>{he.completeRideBtn}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!driverActive.length ? <p className="empty">{he.noActiveDriverRides}</p> : null}
+          </section>
+          <section className="card cardPanel">
+            <h2>{he.walletTitle}</h2>
+            <button onClick={() => loadCreditsLog()} disabled={!token || loading}>{he.loadWallet}</button>
+            <ul className="results compact">
+              {creditsLog.map((item) => (
+                <li key={`credit-${item.id}`}>
+                  <div className="rideBlock">
+                    <strong>{item.delta >= 0 ? he.creditIn : he.creditOut}: {item.delta > 0 ? `+${item.delta}` : item.delta}</strong>
+                    <div className="meta">{item.reason}</div>
+                    <div className="meta">{he.atTime(item.created_at)}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!creditsLog.length ? <p className="empty">{he.emptyWallet}</p> : null}
+          </section>
+          <section className="card cardPanel">
+            <h2>{he.notificationsTitle}</h2>
+            <ul className="results compact">
+              {notifications.map((item) => (
+                <li key={item.id}>
+                  <div className="rideBlock">
+                    <strong>{item.text}</strong>
+                    <div className="meta">{he.atTime(item.createdAt)}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!notifications.length ? <p className="empty">{he.noNotifications}</p> : null}
           </section>
         </>
       ) : null}

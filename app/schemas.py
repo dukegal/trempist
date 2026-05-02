@@ -45,6 +45,10 @@ class RideSearchIn(BaseModel):
 
     origin: str = Field(min_length=1, max_length=255)
     destination: str = Field(default="", max_length=255)
+    departure_from: datetime | None = None
+    departure_to: datetime | None = None
+    leaving_soon_hours: int | None = Field(default=None, ge=1, le=72)
+    sort_by: str = Field(default="departure_asc", max_length=30)
 
 
 class RideOut(BaseModel):
