@@ -1,10 +1,11 @@
+import re
 from datetime import datetime, timedelta
 import os
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import and_, func, inspect, or_, select, text
+from sqlalchemy import and_, delete, func, inspect, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.auth import create_token, decode_token, hash_password, verify_password
@@ -152,20 +153,42 @@ def publish_ride(
     return ride
 
 
+def _destination_is_any(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return v in ("", "any", "*", "all", "everywhere", "כל", "הכל")
+
+
+def _search_tokens(text: str) -> list[str]:
+    """Split on spaces/commas; keep non-empty parts for city-style matching."""
+    parts = re.split(r"[\s,]+", (text or "").strip().lower())
+    return [p for p in parts if p]
+
+
+def _location_matches_column(column, query: str):
+    """Match full substring OR all tokens as substrings (helps city without full street)."""
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    hay = func.lower(column)
+    tokens = _search_tokens(q)
+    if not tokens:
+        return hay.contains(q)
+    token_conds = [hay.contains(t) for t in tokens]
+    return or_(hay.contains(q), and_(*token_conds))
+
+
 @app.post("/rides/search", response_model=list[RideOut])
 def search_rides(payload: RideSearchIn, db: Session = Depends(get_db)):
     now_minus = datetime.utcnow() - timedelta(hours=1)
-    rides = db.scalars(
-        select(Ride).where(
-            and_(
-                Ride.status == RideStatus.OPEN,
-                Ride.seats_available > 0,
-                func.lower(Ride.origin).contains(payload.origin.lower()),
-                func.lower(Ride.destination).contains(payload.destination.lower()),
-                Ride.departure_time >= now_minus,
-            )
-        )
-    ).all()
+    filters = [
+        Ride.status == RideStatus.OPEN,
+        Ride.seats_available > 0,
+        _location_matches_column(Ride.origin, payload.origin),
+        Ride.departure_time >= now_minus,
+    ]
+    if not _destination_is_any(payload.destination):
+        filters.append(_location_matches_column(Ride.destination, payload.destination))
+    rides = db.scalars(select(Ride).where(and_(*filters))).all()
     return rides
 
 
@@ -175,6 +198,24 @@ def my_rides(db: Session = Depends(get_db), current_user: User = Depends(get_cur
         select(Ride).where(Ride.driver_id == current_user.id).order_by(Ride.departure_time.desc())
     ).all()
     return rides
+
+
+@app.delete("/rides/{ride_id}")
+def delete_my_ride(ride_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    ride = db.get(Ride, ride_id)
+    if not ride:
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "Ride not found")
+    if ride.driver_id != current_user.id:
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only the driver can delete this ride")
+    has_accepted = db.scalar(
+        select(Match.id).where(Match.ride_id == ride_id, Match.status == MatchStatus.ACCEPTED).limit(1)
+    )
+    if has_accepted:
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Cannot delete ride with an accepted match")
+    db.execute(delete(Match).where(Match.ride_id == ride_id))
+    db.delete(ride)
+    db.commit()
+    return {"status": "OK", "ride_id": ride_id}
 
 
 @app.get("/users/{user_id}/rides", response_model=list[RideOut])

@@ -125,12 +125,11 @@ function App() {
     return data
   }
 
-  function bindAutocomplete(inputEl, onSelect) {
+  function bindAutocomplete(inputEl, onSelect, extraOptions = null) {
     if (!mapsLoaded || !inputEl || inputEl.dataset.autocompleteBound === '1') return
-    const autocomplete = new window.google.maps.places.Autocomplete(inputEl, {
-      fields: ['formatted_address', 'geometry'],
-      types: ['address'],
-    })
+    const base = { fields: ['formatted_address', 'geometry'] }
+    const opts = extraOptions ? { ...base, ...extraOptions } : { ...base, types: ['address'] }
+    const autocomplete = new window.google.maps.places.Autocomplete(inputEl, opts)
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace()
       if (!place?.geometry?.location) return
@@ -192,14 +191,22 @@ function App() {
 
   useEffect(() => {
     if (!mapsLoaded) return
-    bindAutocomplete(searchOriginRef.current, (address, coords) => {
-      setSearch((prev) => ({ ...prev, origin: address }))
-      setSearchCoords((prev) => ({ ...prev, origin: coords }))
-    })
-    bindAutocomplete(searchDestinationRef.current, (address, coords) => {
-      setSearch((prev) => ({ ...prev, destination: address }))
-      setSearchCoords((prev) => ({ ...prev, destination: coords }))
-    })
+    bindAutocomplete(
+      searchOriginRef.current,
+      (address, coords) => {
+        setSearch((prev) => ({ ...prev, origin: address }))
+        setSearchCoords((prev) => ({ ...prev, origin: coords }))
+      },
+      { types: ['geocode'] },
+    )
+    bindAutocomplete(
+      searchDestinationRef.current,
+      (address, coords) => {
+        setSearch((prev) => ({ ...prev, destination: address }))
+        setSearchCoords((prev) => ({ ...prev, destination: coords }))
+      },
+      { types: ['geocode'] },
+    )
     bindAutocomplete(rideOriginRef.current, (address, coords) => {
       setRide((prev) => ({ ...prev, origin: address }))
       setRideCoords((prev) => ({ ...prev, origin: coords }))
@@ -285,7 +292,11 @@ function App() {
     event.preventDefault()
     await withLoading(async () => {
       try {
-        const data = await callApi('/rides/search', 'POST', search)
+        const payload = {
+          origin: search.origin.trim(),
+          destination: search.destination.trim(),
+        }
+        const data = await callApi('/rides/search', 'POST', payload)
         setRides(data)
         setSelectedDriverId(null)
         setDriverRides([])
@@ -315,6 +326,19 @@ function App() {
         const data = await callApi('/rides/mine', 'GET', null, true)
         setMyPublishedRides(data)
         setMessage(`Loaded ${data.length} rides you published`)
+      } catch (error) {
+        setMessage(error.message)
+      }
+    })
+  }
+
+  async function deleteMyRide(rideId) {
+    if (!window.confirm('Delete this published ride? Pending match requests for it will be removed.')) return
+    await withLoading(async () => {
+      try {
+        await callApi(`/rides/${rideId}`, 'DELETE', null, true)
+        setMyPublishedRides((prev) => prev.filter((r) => r.id !== rideId))
+        setMessage('Ride deleted')
       } catch (error) {
         setMessage(error.message)
       }
@@ -507,10 +531,11 @@ function App() {
         <section className="card">
           <h2>Search Rides</h2>
           <form onSubmit={searchRides}>
-            <input ref={searchOriginRef} placeholder={mapsLoaded ? 'Origin (autocomplete enabled)' : 'Origin'} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
-            <input ref={searchDestinationRef} placeholder={mapsLoaded ? 'Destination (autocomplete enabled)' : 'Destination'} value={search.destination} onChange={(e) => { setSearch({ ...search, destination: e.target.value }); setSearchCoords((prev) => ({ ...prev, destination: null })) }} required />
+            <input ref={searchOriginRef} placeholder={mapsLoaded ? 'Origin: city or full address' : 'Origin'} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
+            <input ref={searchDestinationRef} placeholder={mapsLoaded ? 'Destination, Any, or leave blank' : 'Destination or Any'} value={search.destination} onChange={(e) => { setSearch({ ...search, destination: e.target.value }); setSearchCoords((prev) => ({ ...prev, destination: null })) }} />
             <button type="submit" disabled={loading}>Search</button>
           </form>
+          <p className="empty" style={{ marginTop: '0.5rem' }}>You can type only a city name. For destination, leave empty or type <strong>Any</strong> to see rides to all destinations.</p>
           <div className="mapWrap">
             {!mapsApiKey ? <p className="empty">Add `VITE_GOOGLE_MAPS_API_KEY` to enable map and autocomplete.</p> : null}
             {mapsError ? <p className="empty">{mapsError}</p> : null}
@@ -531,7 +556,7 @@ function App() {
               </li>
             ))}
           </ul>
-          {!rides.length ? <p className="empty">No rides yet. Search by origin and destination.</p> : null}
+            {!rides.length ? <p className="empty">No rides yet. Search by origin; destination is optional.</p> : null}
 
           {selectedDriverId ? (
             <section className="subCard">
@@ -580,6 +605,9 @@ function App() {
                     <strong>#{item.id}</strong>
                     <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">to</span><span className="routeChip">{item.destination}</span></div>
                     <div className="meta">Seats: {item.seats_available} / {item.seats_total}</div>
+                  </div>
+                  <div className="actionCol">
+                    <button type="button" className="ghost" onClick={() => deleteMyRide(item.id)} disabled={!token || loading}>Delete</button>
                   </div>
                 </li>
               ))}

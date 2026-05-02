@@ -41,8 +41,10 @@ class RideCreateIn(BaseModel):
 
 
 class RideSearchIn(BaseModel):
-    origin: str = Field(min_length=2, max_length=255)
-    destination: str = Field(min_length=2, max_length=255)
+    """Origin: city or free text (matched as substring / tokens). Destination: empty or \"Any\" / * matches all destinations."""
+
+    origin: str = Field(min_length=1, max_length=255)
+    destination: str = Field(default="", max_length=255)
 
 
 class RideOut(BaseModel):
