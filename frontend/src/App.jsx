@@ -77,6 +77,8 @@ const he = {
   acceptBtn: 'אשר',
   rejectBtn: 'דחה',
   emptyPending: 'אין בקשות ממתינות לאישור.',
+  incomingRequestsTitle: 'בקשות נכנסות לטרמפים שלי',
+  noIncomingRequests: 'כרגע אין בקשות נכנסות.',
   deleteConfirm: 'למחוק את הנסיעה? בקשות ההתאמה הממתינות אליה יימחקו.',
   regOk: 'נרשמת בהצלחה. אפשר להתחבר.',
   welcomeAfterRegister: (name) => `שלום ${name}! נרשמת והתחברת בהצלחה.`,
@@ -314,6 +316,18 @@ function App() {
   }, [token, me])
 
   useEffect(() => {
+    if (!token) return
+    loadMyRequests({ quiet: true }).catch(() => {})
+    loadDriverPending({ quiet: true }).catch(() => {})
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    if (activeTab === 'driver') loadDriverPending({ quiet: true }).catch(() => {})
+    if (activeTab === 'manage') loadMyRequests({ quiet: true }).catch(() => {})
+  }, [activeTab, token])
+
+  useEffect(() => {
     if (!mapsLoaded) return
     bindAutocomplete(
       searchOriginRef.current,
@@ -480,33 +494,37 @@ function App() {
       try {
         const data = await callApi('/matches/request', 'POST', { ride_id: rideId }, true)
         setMessage(he.matchReq(data.match_id))
-        await loadMyRequests()
+        await loadMyRequests({ quiet: true })
       } catch (error) {
         setMessage(error.message)
       }
     })
   }
 
-  async function loadMyRequests() {
-    await withLoading(async () => {
+  async function loadMyRequests(options = {}) {
+    const { quiet = false } = options
+    const runner = quiet ? async (action) => action() : withLoading
+    await runner(async () => {
       try {
         const data = await callApi('/matches/my-requests', 'GET', null, true)
         setMyRequests(data)
-        setMessage(he.loadedRequests)
+        if (!quiet) setMessage(he.loadedRequests)
       } catch (error) {
-        setMessage(error.message)
+        if (!quiet) setMessage(error.message)
       }
     })
   }
 
-  async function loadDriverPending() {
-    await withLoading(async () => {
+  async function loadDriverPending(options = {}) {
+    const { quiet = false } = options
+    const runner = quiet ? async (action) => action() : withLoading
+    await runner(async () => {
       try {
         const data = await callApi('/matches/driver-pending', 'GET', null, true)
         setDriverPending(data)
-        setMessage(he.loadedDriverReq)
+        if (!quiet) setMessage(he.loadedDriverReq)
       } catch (error) {
-        setMessage(error.message)
+        if (!quiet) setMessage(error.message)
       }
     })
   }
@@ -784,6 +802,22 @@ function App() {
               ))}
             </ul>
             {!myRequests.length ? <p className="empty">{he.emptyRequests}</p> : null}
+          </section>
+          <section className="card cardPanel">
+            <h2>{he.incomingRequestsTitle}</h2>
+            <button onClick={loadDriverPending} disabled={!token || loading}>{he.loadPending}</button>
+            <ul className="results">
+              {driverPending.map((item) => (
+                <li key={`incoming-${item.match_id}`}>
+                  <div><strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong></div>
+                  <div className="actionCol">
+                    <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
+                    <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>{he.rejectBtn}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {!driverPending.length ? <p className="empty">{he.noIncomingRequests}</p> : null}
           </section>
         </>
       ) : null}
