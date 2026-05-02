@@ -1,11 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
   <defs>
-    <linearGradient id="trempistLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3ddbff"/>
-      <stop offset="100%" stop-color="#5b4dff"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2ee6ff"/>
+      <stop offset="55%" stop-color="#00a8dc"/>
+      <stop offset="100%" stop-color="#6b4dff"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e8fbff"/>
     </linearGradient>
   </defs>
-  <rect width="72" height="72" rx="20" fill="url(#trempistLogoGrad)"/>
-  <rect x="12" y="16" width="48" height="12" rx="6" fill="#fff" fill-opacity="0.95"/>
-  <rect x="30" y="22" width="12" height="36" rx="6" fill="#fff" fill-opacity="0.95"/>
+  <!-- soft tile -->
+  <rect width="72" height="72" rx="20" fill="url(#bg)"/>
+  <!-- road hint -->
+  <path fill="rgba(255,255,255,0.22)" d="M8 58c16-6 40-6 56 0v6H8v-6z"/>
+  <path fill="rgba(255,255,255,0.35)" d="M14 54h6v3h-6zm12 0h5v3h-5zm11 0h6v3h-6zm12 0h5v3h-5zm11 0h6v3h-6z"/>
+  <!-- car body (side, friendly blob) -->
+  <path fill="url(#car)" d="M18 38c0-8 6-14 14-14h8c8 0 14 6 14 14v4H18v-4z"/>
+  <!-- cabin / roof -->
+  <path fill="url(#car)" d="M26 24c2-6 7-10 14-10h2c7 0 12 4 14 10v8H26v-8z" opacity="0.92"/>
+  <!-- windshield -->
+  <path fill="#1a5a7a" fill-opacity="0.35" d="M30 26h20c1 0 2 1 2 2v5H28v-5c0-1 1-2 2-2z"/>
+  <!-- wheels -->
+  <circle cx="26" cy="44" r="5" fill="#0d2137"/>
+  <circle cx="46" cy="44" r="5" fill="#0d2137"/>
+  <circle cx="26" cy="44" r="2.2" fill="#5a6b7a"/>
+  <circle cx="46" cy="44" r="2.2" fill="#5a6b7a"/>
+  <!-- headlight -->
+  <circle cx="52" cy="36" r="2" fill="#ffe066"/>
 </svg>
