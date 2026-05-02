@@ -1,31 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" aria-hidden="true">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2ee6ff"/>
-      <stop offset="55%" stop-color="#00a8dc"/>
-      <stop offset="100%" stop-color="#6b4dff"/>
+    <linearGradient id="lg" x1="12%" y1="8%" x2="92%" y2="92%">
+      <stop offset="0%" stop-color="#3ae8ff"/>
+      <stop offset="45%" stop-color="#00a8e6"/>
+      <stop offset="100%" stop-color="#6e52ff"/>
     </linearGradient>
-    <linearGradient id="car" x1="0%" y1="50%" x2="100%" y2="50%">
+    <linearGradient id="body" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e8fbff"/>
+      <stop offset="100%" stop-color="#d4f4ff"/>
     </linearGradient>
+    <filter id="sh" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25"/>
+    </filter>
   </defs>
-  <!-- soft tile -->
-  <rect width="72" height="72" rx="20" fill="url(#bg)"/>
-  <!-- road hint -->
-  <path fill="rgba(255,255,255,0.22)" d="M8 58c16-6 40-6 56 0v6H8v-6z"/>
-  <path fill="rgba(255,255,255,0.35)" d="M14 54h6v3h-6zm12 0h5v3h-5zm11 0h6v3h-6zm12 0h5v3h-5zm11 0h6v3h-6z"/>
-  <!-- car body (side, friendly blob) -->
-  <path fill="url(#car)" d="M18 38c0-8 6-14 14-14h8c8 0 14 6 14 14v4H18v-4z"/>
-  <!-- cabin / roof -->
-  <path fill="url(#car)" d="M26 24c2-6 7-10 14-10h2c7 0 12 4 14 10v8H26v-8z" opacity="0.92"/>
-  <!-- windshield -->
-  <path fill="#1a5a7a" fill-opacity="0.35" d="M30 26h20c1 0 2 1 2 2v5H28v-5c0-1 1-2 2-2z"/>
+  <rect width="80" height="80" rx="22" fill="url(#lg)"/>
+  <!-- road -->
+  <path fill="rgba(13,33,55,0.2)" d="M6 62h68v8H6z"/>
+  <path fill="rgba(255,255,255,0.45)" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-dasharray="5 6" d="M10 66h60"/>
+  <!-- car shadow -->
+  <ellipse cx="42" cy="54" rx="26" ry="5" fill="rgba(13,33,55,0.28)"/>
+  <!-- lower body -->
+  <path filter="url(#sh)" fill="url(#body)" d="M14 44c0-4 3.5-7 8-7h36c4.5 0 8 3 8 7v6H14v-6z"/>
+  <!-- upper cabin -->
+  <path fill="url(#body)" d="M22 28c2.5-8 9-12 18-12s15.5 4 18 12v12H22V28z"/>
+  <!-- windows -->
+  <path fill="#1a6a8a" fill-opacity="0.45" d="M26 30h12v9H26zm16 0h12v9H42z"/>
+  <!-- door line -->
+  <path stroke="rgba(13,33,55,0.15)" stroke-width="1.2" d="M40 28v16"/>
   <!-- wheels -->
-  <circle cx="26" cy="44" r="5" fill="#0d2137"/>
-  <circle cx="46" cy="44" r="5" fill="#0d2137"/>
-  <circle cx="26" cy="44" r="2.2" fill="#5a6b7a"/>
-  <circle cx="46" cy="44" r="2.2" fill="#5a6b7a"/>
-  <!-- headlight -->
-  <circle cx="52" cy="36" r="2" fill="#ffe066"/>
+  <circle cx="24" cy="48" r="7" fill="#0d2137"/>
+  <circle cx="56" cy="48" r="7" fill="#0d2137"/>
+  <circle cx="24" cy="48" r="3" fill="#94a3b8"/>
+  <circle cx="56" cy="48" r="3" fill="#94a3b8"/>
+  <!-- bumper + light -->
+  <rect x="64" y="40" width="4" height="6" rx="1" fill="#ffe566"/>
+  <path fill="rgba(13,33,55,0.12)" d="M14 48h6v4h-6z"/>
 </svg>

@@ -17,7 +17,6 @@ const he = {
   apiLabel: 'שרת',
   themeDark: 'מצב כהה',
   themeLight: 'מצב בהיר',
-  rtlToggle: 'כיוון ממשק',
   profileMenu: 'הפרופיל שלי',
   creditsShort: 'נקודות',
   logout: 'התנתקות',
@@ -116,7 +115,6 @@ function Icon({ name }) {
     driver: 'M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11v6h-2v-2H7v2H5v-6zm2.2-4L6.4 11h11.2l-.8-4H7.2zM8.5 13.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z',
     moon: 'M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 1 0 20 14.5z',
     sun: 'M12 4V2m0 20v-2m8-8h2M2 12h2m12.95 6.95 1.41 1.41M3.64 3.64 5.05 5.05m11.9 0 1.41-1.41M3.64 20.36l1.41-1.41M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z',
-    rtl: 'M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2z',
     user: 'M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z',
   }
   return (
@@ -160,7 +158,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('discover')
   const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
-  const [isRtl, setIsRtl] = useState(() => localStorage.getItem('rtl') !== '0')
   const [menuOpen, setMenuOpen] = useState(false)
   const [auth, setAuth] = useState({ name: '', phone: '', email: '', password: '' })
   const [login, setLogin] = useState({ email: '', password: '' })
@@ -198,7 +195,7 @@ function App() {
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
   }, [token])
 
-  const rootClassName = `container theme-${theme} ${isRtl ? 'rtl' : ''}`
+  const rootClassName = `container theme-${theme} rtl`
   const stats = {
     ridesFound: rides.length,
     myRequests: myRequests.length,
@@ -543,15 +540,9 @@ function App() {
     localStorage.setItem('theme', next)
   }
 
-  function toggleRtl() {
-    const next = !isRtl
-    setIsRtl(next)
-    localStorage.setItem('rtl', next ? '1' : '0')
-  }
-
   if (!token) {
     return (
-      <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
+      <main className={rootClassName} dir="rtl">
         <section className="authScreen">
           <div className="authCard">
             <div className="brandBlock">
@@ -588,7 +579,7 @@ function App() {
   }
 
   return (
-    <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
+    <main className={rootClassName} dir="rtl">
       <header className="hero">
         <div>
           <div className="brandBlock">
@@ -602,7 +593,6 @@ function App() {
         </div>
         <div className="statusWrap controls">
           <button type="button" className="iconBtn ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? he.themeDark : he.themeLight}</button>
-          <button type="button" className="iconBtn ghost" onClick={toggleRtl}><Icon name="rtl" />{he.rtlToggle}</button>
           <div className="profileMenuWrap">
             <button type="button" className="iconBtn ghost iconOnly" onClick={() => setMenuOpen((prev) => !prev)}><Icon name="user" /></button>
             {menuOpen ? (
