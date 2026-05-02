@@ -3,8 +3,10 @@ from datetime import datetime, timedelta
 import os
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import and_, delete, func, inspect, or_, select, text
 from sqlalchemy.orm import Session
 
@@ -43,8 +45,21 @@ def ensure_match_lifecycle_columns():
 
 ensure_match_lifecycle_columns()
 
-app = FastAPI(title="TREMPIST MVP API")
+app = FastAPI(title="טרמפיסט — API")
 MATCH_REQUEST_TTL_HOURS = int(os.getenv("MATCH_REQUEST_TTL_HOURS", "24"))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, _exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": {
+                "code": "E422",
+                "message": "הנתונים שנשלחו אינם תקינים (אורך, פורמט או ערכים חסרים).",
+            }
+        },
+    )
 
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin.strip()]
 app.add_middleware(
@@ -83,14 +98,14 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     if not authorization or not authorization.startswith("Bearer "):
-        api_error(status.HTTP_401_UNAUTHORIZED, "E401", "Missing or invalid Authorization header")
+        api_error(status.HTTP_401_UNAUTHORIZED, "E401", "כותרת הרשאה חסרה או לא תקינה")
     token = authorization.split(" ", 1)[1].strip()
     user_id = decode_token(token)
     user = db.get(User, user_id)
     if not user:
-        api_error(status.HTTP_401_UNAUTHORIZED, "E401", "User not found")
+        api_error(status.HTTP_401_UNAUTHORIZED, "E401", "משתמש לא נמצא")
     if user.is_blocked:
-        api_error(status.HTTP_403_FORBIDDEN, "E012", "User blocked")
+        api_error(status.HTTP_403_FORBIDDEN, "E012", "המשתמש חסום")
     return user
 
 
@@ -103,7 +118,7 @@ def health():
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
-        api_error(status.HTTP_400_BAD_REQUEST, "E002", "Email already exists")
+        api_error(status.HTTP_400_BAD_REQUEST, "E002", "כתובת האימייל כבר רשומה במערכת")
     user = User(
         name=payload.name,
         email=payload.email,
@@ -121,9 +136,9 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
-        api_error(status.HTTP_401_UNAUTHORIZED, "E001", "Invalid email or password")
+        api_error(status.HTTP_401_UNAUTHORIZED, "E001", "אימייל או סיסמה שגויים")
     if user.is_blocked:
-        api_error(status.HTTP_403_FORBIDDEN, "E012", "User blocked")
+        api_error(status.HTTP_403_FORBIDDEN, "E012", "המשתמש חסום")
     return {"token": create_token(user.id), "user_id": user.id}
 
 
@@ -204,14 +219,14 @@ def my_rides(db: Session = Depends(get_db), current_user: User = Depends(get_cur
 def delete_my_ride(ride_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     ride = db.get(Ride, ride_id)
     if not ride:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Ride not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "הנסיעה לא נמצאה")
     if ride.driver_id != current_user.id:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only the driver can delete this ride")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "רק נהג הנסיעה יכול למחוק אותה")
     has_accepted = db.scalar(
         select(Match.id).where(Match.ride_id == ride_id, Match.status == MatchStatus.ACCEPTED).limit(1)
     )
     if has_accepted:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Cannot delete ride with an accepted match")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "לא ניתן למחוק נסיעה שיש לה התאמה מאושרת")
     db.execute(delete(Match).where(Match.ride_id == ride_id))
     db.delete(ride)
     db.commit()
@@ -235,13 +250,13 @@ def request_match(
     expire_stale_matches(db)
     ride = db.get(Ride, payload.ride_id)
     if not ride:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Ride not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "הנסיעה לא נמצאה")
     if ride.driver_id == current_user.id:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Driver cannot request own ride")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "נהג לא יכול לבקש להצטרף לנסיעה שלו")
     if ride.seats_available <= 0:
-        api_error(status.HTTP_400_BAD_REQUEST, "E004", "No seats available")
+        api_error(status.HTTP_400_BAD_REQUEST, "E004", "אין מקומות פנויים")
     if current_user.credits < 1:
-        api_error(status.HTTP_400_BAD_REQUEST, "E003", "Not enough credits")
+        api_error(status.HTTP_400_BAD_REQUEST, "E003", "אין מספיק נקודות זכות")
     existing_request = db.scalar(
         select(Match).where(
             and_(
@@ -252,7 +267,7 @@ def request_match(
         )
     )
     if existing_request:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match request already exists")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "בקשת התאמה לנסיעה זו כבר קיימת")
 
     match = Match(
         ride_id=ride.id,
@@ -276,21 +291,21 @@ def accept_match(
     expire_stale_matches(db)
     match = db.get(Match, payload.match_id)
     if not match:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Match not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "ההתאמה לא נמצאה")
 
     ride = db.get(Ride, match.ride_id)
     if not ride:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Ride not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "הנסיעה לא נמצאה")
     if ride.driver_id != current_user.id:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only driver can confirm")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "רק הנהג יכול לאשר")
     if match.status != MatchStatus.PENDING:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match is not pending")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "ההתאמה אינה במצב ממתין")
     if ride.seats_available <= 0:
-        api_error(status.HTTP_400_BAD_REQUEST, "E004", "No seats available")
+        api_error(status.HTTP_400_BAD_REQUEST, "E004", "אין מקומות פנויים")
 
     passenger = db.get(User, match.passenger_id)
     if not passenger or passenger.credits < 1:
-        api_error(status.HTTP_400_BAD_REQUEST, "E003", "Passenger has no credits")
+        api_error(status.HTTP_400_BAD_REQUEST, "E003", "לנוסע אין מספיק נקודות זכות")
 
     match.confirmed_by_driver = True
     match.status = MatchStatus.ACCEPTED
@@ -362,12 +377,12 @@ def reject_match(payload: MatchConfirmIn, db: Session = Depends(get_db), current
     expire_stale_matches(db)
     match = db.get(Match, payload.match_id)
     if not match:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Match not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "ההתאמה לא נמצאה")
     ride = db.get(Ride, match.ride_id)
     if not ride or ride.driver_id != current_user.id:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only driver can reject")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "רק הנהג יכול לדחות")
     if match.status != MatchStatus.PENDING:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match is not pending")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "ההתאמה אינה במצב ממתין")
     match.status = MatchStatus.REJECTED
     match.responded_at = datetime.utcnow()
     db.commit()
@@ -379,11 +394,11 @@ def cancel_match(payload: MatchConfirmIn, db: Session = Depends(get_db), current
     expire_stale_matches(db)
     match = db.get(Match, payload.match_id)
     if not match:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Match not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "ההתאמה לא נמצאה")
     if match.passenger_id != current_user.id:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only passenger can cancel")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "רק הנוסע יכול לבטל")
     if match.status not in [MatchStatus.PENDING, MatchStatus.ACCEPTED]:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match cannot be cancelled")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "לא ניתן לבטל התאמה זו")
     ride = db.get(Ride, match.ride_id)
     if match.status == MatchStatus.ACCEPTED and ride:
         ride.seats_available += 1
@@ -398,16 +413,16 @@ def cancel_match(payload: MatchConfirmIn, db: Session = Depends(get_db), current
 def complete_match(payload: MatchConfirmIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     match = db.get(Match, payload.match_id)
     if not match:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "Match not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "ההתאמה לא נמצאה")
     ride = db.get(Ride, match.ride_id)
     if not ride or ride.driver_id != current_user.id:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Only driver can complete")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "רק הנהג יכול לסמן השלמה")
     if match.status != MatchStatus.ACCEPTED:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Match is not accepted")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "ההתאמה לא אושרה")
     passenger = db.get(User, match.passenger_id)
     driver = db.get(User, ride.driver_id)
     if not passenger or passenger.credits < 1:
-        api_error(status.HTTP_400_BAD_REQUEST, "E003", "Passenger has no credits")
+        api_error(status.HTTP_400_BAD_REQUEST, "E003", "לנוסע אין מספיק נקודות זכות")
 
     passenger.credits -= 1
     driver.credits += 1
@@ -437,7 +452,7 @@ def add_rating(
     current_user: User = Depends(get_current_user),
 ):
     if payload.rated_user_id == current_user.id:
-        api_error(status.HTTP_400_BAD_REQUEST, "E400", "Cannot rate self")
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "לא ניתן לדרג את עצמך")
 
     has_shared_ride = db.scalar(
         select(Match)
@@ -454,7 +469,7 @@ def add_rating(
         )
     )
     if not has_shared_ride:
-        api_error(status.HTTP_400_BAD_REQUEST, "E014", "Cannot rate user without shared ride")
+        api_error(status.HTTP_400_BAD_REQUEST, "E014", "לא ניתן לדרג משתמש ללא נסיעה משותפת")
 
     rating = Rating(
         rater_id=current_user.id,
@@ -476,10 +491,10 @@ def add_rating(
 def admin_block(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Temporary MVP rule: user with id=1 is admin.
     if current_user.id != 1:
-        api_error(status.HTTP_403_FORBIDDEN, "E403", "Admin only")
+        api_error(status.HTTP_403_FORBIDDEN, "E403", "פעולה למנהלים בלבד")
     user = db.get(User, user_id)
     if not user:
-        api_error(status.HTTP_404_NOT_FOUND, "E404", "User not found")
+        api_error(status.HTTP_404_NOT_FOUND, "E404", "משתמש לא נמצא")
     user.is_blocked = True
     db.commit()
     return {"status": "OK", "user_id": user_id}

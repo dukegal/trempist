@@ -41,7 +41,7 @@ class RideCreateIn(BaseModel):
 
 
 class RideSearchIn(BaseModel):
-    """Origin: city or free text (matched as substring / tokens). Destination: empty or \"Any\" / * matches all destinations."""
+    """מוצא: עיר או טקסט חופשי. יעד: ריק או «כל» / Any / * — ללא סינון יעד."""
 
     origin: str = Field(min_length=1, max_length=255)
     destination: str = Field(default="", max_length=255)

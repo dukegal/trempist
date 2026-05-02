@@ -2,6 +2,113 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
+/** ממשק בעברית */
+const he = {
+  appName: 'טרמפיסט',
+  requestFailed: 'הבקשה נכשלה',
+  mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
+  welcome: 'ברוכים הבאים לטרמפיסט',
+  authSubtitle: 'התחברו כדי לחפש נסיעות, לנהל התאמות ולצפות בפרופיל.',
+  loginTab: 'התחברות',
+  signupTab: 'הרשמה',
+  loginBtn: 'התחבר',
+  createAccount: 'יצירת חשבון',
+  tagline: 'טרמפים קהילתיים עם נקודות זכות',
+  apiLabel: 'שרת',
+  themeDark: 'מצב כהה',
+  themeLight: 'מצב בהיר',
+  rtlToggle: 'כיוון ממשק',
+  profileMenu: 'הפרופיל שלי',
+  creditsShort: 'נקודות',
+  logout: 'התנתקות',
+  connected: 'מחובר',
+  guest: 'אורח',
+  loading: 'טוען',
+  ready: 'מוכן',
+  ridesFound: 'נסיעות בתוצאות',
+  myRequestsStat: 'בקשות שלי',
+  pendingApprovals: 'ממתינים לאישור',
+  tabDiscover: 'גילוי',
+  tabManage: 'ניהול',
+  tabDriver: 'נהג',
+  profileSnapshot: 'פרופיל',
+  labelName: 'שם',
+  labelEmail: 'אימייל',
+  labelCredits: 'נקודות זכות',
+  labelRating: 'דירוג',
+  password: 'סיסמה',
+  phone: 'טלפון',
+  searchRidesTitle: 'חיפוש נסיעות',
+  originPh: 'מוצא: עיר או כתובת מלאה',
+  originPhShort: 'מוצא',
+  destPh: 'יעד, «כל היעדים», או ריק לכל היעדים',
+  destPhShort: 'יעד או כל היעדים',
+  searchBtn: 'חיפוש',
+  searchHint:
+    'אפשר להזין רק שם עיר. ביעד השאירו ריק או הזינו «כל» / Any כדי לראות נסיעות לכל היעדים.',
+  mapsKeyHint: 'הוסיפו VITE_GOOGLE_MAPS_API_KEY כדי להפעיל מפה והשלמה אוטומטית.',
+  routeSep: 'ל',
+  seatsAvail: 'מקומות פנויים',
+  driver: 'נהג',
+  requestMatch: 'בקשת התאמה',
+  viewDriverRides: 'נסיעות של הנהג',
+  emptyDiscover: 'אין נסיעות עדיין. חפשו לפי מוצא; היעד אופציונלי.',
+  driverRidesTitle: 'נסיעות שפורסמו על ידי משתמש מס׳',
+  seatsRatio: 'מקומות',
+  emptyDriverList: 'אין נסיעות שפורסמו על ידי משתמש זה.',
+  publishTitle: 'פרסום נסיעה',
+  originPubPh: 'מוצא (השלמה אוטומטית)',
+  originPubShort: 'מוצא',
+  destPubPh: 'יעד (השלמה אוטומטית)',
+  destPubShort: 'יעד',
+  publishBtn: 'פרסום',
+  myRidesTitle: 'הנסיעות שפרסמתי',
+  loadMyRides: 'טען את הנסיעות שלי',
+  deleteRide: 'מחק',
+  emptyMyRides: 'טרם פרסמת נסיעות.',
+  myMatchesTitle: 'בקשות ההתאמה שלי',
+  loadMyRequests: 'טען בקשות',
+  status: 'סטטוס',
+  cancelBtn: 'ביטול',
+  emptyRequests: 'אין בקשות התאמה.',
+  driverPendingTitle: 'בקשות ממתינות (נהג)',
+  loadPending: 'טען ממתינים',
+  acceptBtn: 'אשר',
+  rejectBtn: 'דחה',
+  emptyPending: 'אין בקשות ממתינות לאישור.',
+  deleteConfirm: 'למחוק את הנסיעה? בקשות ההתאמה הממתינות אליה יימחקו.',
+  regOk: 'נרשמת בהצלחה. אפשר להתחבר.',
+  loggedIn: 'התחברת בהצלחה',
+  profileLoaded: 'הפרופיל נטען',
+  ridePublished: 'הנסיעה פורסמה',
+  foundRides: (n) => `נמצאו ${n} נסיעות`,
+  loadedForUser: (n, uid) => `נטענו ${n} נסיעות עבור משתמש מס׳ ${uid}`,
+  loadedMyPub: (n) => `נטענו ${n} נסיעות שפרסמת`,
+  rideDeleted: 'הנסיעה נמחקה',
+  matchReq: (id) => `נשלחה בקשת התאמה (מס׳ ${id})`,
+  loadedRequests: 'בקשות ההתאמה נטענו',
+  loadedDriverReq: 'בקשות ממתינות לנסיעות שלך נטענו',
+  matchAccepted: (id) => `התאמה מס׳ ${id} אושרה`,
+  matchRejected: (id) => `התאמה מס׳ ${id} נדחתה`,
+  matchCancelled: (id) => `התאמה מס׳ ${id} בוטלה`,
+  loggedOut: 'התנתקת',
+  routeDrawErr: (s) => `שרטוט המסלול נכשל (${s}). ודאו ש-Directions API מופעל.`,
+  matchLine: (mid, rid) => `התאמה מס׳ ${mid} · נסיעה מס׳ ${rid}`,
+  matchLineDriver: (mid, rid, pid) => `התאמה מס׳ ${mid} · נסיעה מס׳ ${rid} · נוסע מס׳ ${pid}`,
+}
+
+function matchStatusHe(s) {
+  const m = {
+    PENDING: 'ממתין',
+    ACCEPTED: 'אושר',
+    REJECTED: 'נדחה',
+    COMPLETED: 'הושלם',
+    CANCELLED: 'בוטל',
+    EXPIRED: 'פג תוקף',
+  }
+  return m[s] || s
+}
+
 function Icon({ name }) {
   const paths = {
     discover: 'M10 2a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V2zm8 0v6h-6V6h2.59L10 10.59 11.41 12 16 7.41V10h2V2z',
@@ -40,7 +147,7 @@ function useGoogleMaps(apiKey) {
     script.async = true
     script.defer = true
     script.onload = () => setLoaded(true)
-    script.onerror = () => setError('Google Maps failed to load. Check API key and domain restrictions.')
+    script.onerror = () => setError(he.mapsLoadError)
     document.body.appendChild(script)
   }, [apiKey])
   return { loaded, error }
@@ -48,12 +155,12 @@ function useGoogleMaps(apiKey) {
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '')
-  const [message, setMessage] = useState('Welcome to TREMPIST')
+  const [message, setMessage] = useState(he.welcome)
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('discover')
   const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
-  const [isRtl, setIsRtl] = useState(localStorage.getItem('rtl') === '1')
+  const [isRtl, setIsRtl] = useState(() => localStorage.getItem('rtl') !== '0')
   const [menuOpen, setMenuOpen] = useState(false)
   const [auth, setAuth] = useState({ name: '', phone: '', email: '', password: '' })
   const [login, setLogin] = useState({ email: '', password: '' })
@@ -119,7 +226,7 @@ function App() {
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      const detail = data?.detail?.message || data?.detail || 'Request failed'
+      const detail = data?.detail?.message || data?.detail || he.requestFailed
       throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
     }
     return data
@@ -183,7 +290,7 @@ function App() {
         if (status === 'OK' && result) {
           directionsRendererRef.current.setDirections(result)
         } else if (status && status !== 'OK') {
-          setMessage(`Route draw failed (${status}). Verify Directions API is enabled.`)
+          setMessage(he.routeDrawErr(status))
         }
       },
     )
@@ -240,7 +347,7 @@ function App() {
         await callApi('/auth/register', 'POST', auth)
         setAuth({ name: '', phone: '', email: '', password: '' })
         setAuthMode('login')
-        setMessage('Registered successfully. Please login.')
+        setMessage(he.regOk)
       } catch (error) {
         setMessage(error.message)
       }
@@ -254,7 +361,7 @@ function App() {
         const data = await callApi('/auth/login', 'POST', login)
         localStorage.setItem('token', data.token)
         setToken(data.token)
-        setMessage('Logged in')
+        setMessage(he.loggedIn)
         await loadProfile()
         await loadMyPublishedRides()
       } catch (error) {
@@ -267,7 +374,7 @@ function App() {
     try {
       const data = await callApi('/users/me', 'GET', null, true)
       setMe(data)
-      setMessage('Profile loaded')
+      setMessage(he.profileLoaded)
     } catch (error) {
       setMessage(error.message)
     }
@@ -279,7 +386,7 @@ function App() {
       try {
         const payload = { ...ride, departure_time: new Date(ride.departure_time).toISOString(), seats_total: Number(ride.seats_total) }
         await callApi('/rides', 'POST', payload, true)
-        setMessage('Ride published')
+        setMessage(he.ridePublished)
         setRide({ origin: '', destination: '', departure_time: '', seats_total: 1 })
         setRideCoords({ origin: null, destination: null })
       } catch (error) {
@@ -300,7 +407,7 @@ function App() {
         setRides(data)
         setSelectedDriverId(null)
         setDriverRides([])
-        setMessage(`Found ${data.length} rides`)
+        setMessage(he.foundRides(data.length))
       } catch (error) {
         setMessage(error.message)
       }
@@ -313,7 +420,7 @@ function App() {
         const data = await callApi(`/users/${userId}/rides`, 'GET')
         setSelectedDriverId(userId)
         setDriverRides(data)
-        setMessage(`Loaded ${data.length} rides for user ${userId}`)
+        setMessage(he.loadedForUser(data.length, userId))
       } catch (error) {
         setMessage(error.message)
       }
@@ -325,7 +432,7 @@ function App() {
       try {
         const data = await callApi('/rides/mine', 'GET', null, true)
         setMyPublishedRides(data)
-        setMessage(`Loaded ${data.length} rides you published`)
+        setMessage(he.loadedMyPub(data.length))
       } catch (error) {
         setMessage(error.message)
       }
@@ -333,12 +440,12 @@ function App() {
   }
 
   async function deleteMyRide(rideId) {
-    if (!window.confirm('Delete this published ride? Pending match requests for it will be removed.')) return
+    if (!window.confirm(he.deleteConfirm)) return
     await withLoading(async () => {
       try {
         await callApi(`/rides/${rideId}`, 'DELETE', null, true)
         setMyPublishedRides((prev) => prev.filter((r) => r.id !== rideId))
-        setMessage('Ride deleted')
+        setMessage(he.rideDeleted)
       } catch (error) {
         setMessage(error.message)
       }
@@ -349,7 +456,7 @@ function App() {
     await withLoading(async () => {
       try {
         const data = await callApi('/matches/request', 'POST', { ride_id: rideId }, true)
-        setMessage(`Match requested (id ${data.match_id})`)
+        setMessage(he.matchReq(data.match_id))
         await loadMyRequests()
       } catch (error) {
         setMessage(error.message)
@@ -362,7 +469,7 @@ function App() {
       try {
         const data = await callApi('/matches/my-requests', 'GET', null, true)
         setMyRequests(data)
-        setMessage('Loaded my match requests')
+        setMessage(he.loadedRequests)
       } catch (error) {
         setMessage(error.message)
       }
@@ -374,7 +481,7 @@ function App() {
       try {
         const data = await callApi('/matches/driver-pending', 'GET', null, true)
         setDriverPending(data)
-        setMessage('Loaded pending requests for my rides')
+        setMessage(he.loadedDriverReq)
       } catch (error) {
         setMessage(error.message)
       }
@@ -385,7 +492,7 @@ function App() {
     await withLoading(async () => {
       try {
         await callApi('/matches/accept', 'POST', { match_id: matchId }, true)
-        setMessage(`Match ${matchId} accepted`)
+        setMessage(he.matchAccepted(matchId))
         await loadDriverPending()
         await loadProfile()
       } catch (error) {
@@ -398,7 +505,7 @@ function App() {
     await withLoading(async () => {
       try {
         await callApi('/matches/reject', 'POST', { match_id: matchId }, true)
-        setMessage(`Match ${matchId} rejected`)
+        setMessage(he.matchRejected(matchId))
         await loadDriverPending()
       } catch (error) {
         setMessage(error.message)
@@ -410,7 +517,7 @@ function App() {
     await withLoading(async () => {
       try {
         await callApi('/matches/cancel', 'POST', { match_id: matchId }, true)
-        setMessage(`Match ${matchId} cancelled`)
+        setMessage(he.matchCancelled(matchId))
         await loadMyRequests()
       } catch (error) {
         setMessage(error.message)
@@ -427,7 +534,7 @@ function App() {
     setDriverPending([])
     setDriverRides([])
     setSelectedDriverId(null)
-    setMessage('Logged out')
+    setMessage(he.loggedOut)
   }
 
   function toggleTheme() {
@@ -447,26 +554,26 @@ function App() {
       <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
         <section className="authScreen">
           <div className="authCard">
-            <h1>TREMPIST</h1>
-            <p className="sub">Sign in to access rides, matches, and profile.</p>
+            <h1>{he.appName}</h1>
+            <p className="sub">{he.authSubtitle}</p>
             {message ? <p className="message">{message}</p> : null}
             <div className="authSwitch">
-              <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>Login</button>
-              <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>Sign Up</button>
+              <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
+              <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>{he.signupTab}</button>
             </div>
             {authMode === 'login' ? (
               <form onSubmit={loginSubmit}>
-                <input type="email" placeholder="Email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
-                <input type="password" placeholder="Password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
-                <button type="submit" disabled={loading}>Login</button>
+                <input type="email" placeholder={he.labelEmail} value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
+                <input type="password" placeholder={he.password} value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
+                <button type="submit" disabled={loading}>{he.loginBtn}</button>
               </form>
             ) : (
               <form onSubmit={registerSubmit}>
-                <input placeholder="Name" value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required />
-                <input placeholder="Phone" value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
-                <input type="email" placeholder="Email" value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
-                <input type="password" placeholder="Password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required />
-                <button type="submit" disabled={loading}>Create Account</button>
+                <input placeholder={he.labelName} value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required />
+                <input placeholder={he.phone} value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
+                <input type="email" placeholder={he.labelEmail} value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
+                <input type="password" placeholder={he.password} value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required />
+                <button type="submit" disabled={loading}>{he.createAccount}</button>
               </form>
             )}
           </div>
@@ -479,65 +586,65 @@ function App() {
     <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
       <header className="hero">
         <div>
-          <h1>TREMPIST</h1>
-          <p className="sub">Community rides powered by credits</p>
-          <p className="api">API: {API_BASE_URL}</p>
+          <h1>{he.appName}</h1>
+          <p className="sub">{he.tagline}</p>
+          <p className="api">{he.apiLabel}: {API_BASE_URL}</p>
         </div>
         <div className="statusWrap controls">
-          <button type="button" className="iconBtn ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? 'Dark' : 'Light'}</button>
-          <button type="button" className="iconBtn ghost" onClick={toggleRtl}><Icon name="rtl" />RTL</button>
+          <button type="button" className="iconBtn ghost" onClick={toggleTheme}><Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? he.themeDark : he.themeLight}</button>
+          <button type="button" className="iconBtn ghost" onClick={toggleRtl}><Icon name="rtl" />{he.rtlToggle}</button>
           <div className="profileMenuWrap">
             <button type="button" className="iconBtn ghost iconOnly" onClick={() => setMenuOpen((prev) => !prev)}><Icon name="user" /></button>
             {menuOpen ? (
               <div className="profileMenu">
-                <button type="button" className="menuItem" onClick={() => withLoading(loadProfile)}>My Profile</button>
-                {me ? <div className="menuMeta">{me.name} | Credits: {me.credits}</div> : null}
-                <button type="button" className="menuItem danger" onClick={logout}>Logout</button>
+                <button type="button" className="menuItem" onClick={() => withLoading(loadProfile)}>{he.profileMenu}</button>
+                {me ? <div className="menuMeta">{me.name} · {he.creditsShort}: {me.credits}</div> : null}
+                <button type="button" className="menuItem danger" onClick={logout}>{he.logout}</button>
               </div>
             ) : null}
           </div>
-          <span className={`status ${token ? 'ok' : 'off'}`}>{token ? 'Connected' : 'Guest'}</span>
-          <span className={`status ${loading ? 'busy' : 'ok'}`}>{loading ? 'Loading' : 'Ready'}</span>
+          <span className={`status ${token ? 'ok' : 'off'}`}>{token ? he.connected : he.guest}</span>
+          <span className={`status ${loading ? 'busy' : 'ok'}`}>{loading ? he.loading : he.ready}</span>
         </div>
       </header>
 
       {message ? <p className="message">{message}</p> : null}
 
       <section className="card statsBar">
-        <div className="stat"><span>Rides Found</span><strong>{stats.ridesFound}</strong></div>
-        <div className="stat"><span>My Requests</span><strong>{stats.myRequests}</strong></div>
-        <div className="stat"><span>Pending Approvals</span><strong>{stats.pendingApprovals}</strong></div>
+        <div className="stat"><span>{he.ridesFound}</span><strong>{stats.ridesFound}</strong></div>
+        <div className="stat"><span>{he.myRequestsStat}</span><strong>{stats.myRequests}</strong></div>
+        <div className="stat"><span>{he.pendingApprovals}</span><strong>{stats.pendingApprovals}</strong></div>
       </section>
 
       <section className="card tabs">
-        <button className={activeTab === 'discover' ? 'tab active' : 'tab'} onClick={() => setActiveTab('discover')} type="button"><Icon name="discover" />Discover</button>
-        <button className={activeTab === 'manage' ? 'tab active' : 'tab'} onClick={() => setActiveTab('manage')} type="button"><Icon name="manage" />Manage</button>
-        <button className={activeTab === 'driver' ? 'tab active' : 'tab'} onClick={() => setActiveTab('driver')} type="button"><Icon name="driver" />Driver</button>
+        <button className={activeTab === 'discover' ? 'tab active' : 'tab'} onClick={() => setActiveTab('discover')} type="button"><Icon name="discover" />{he.tabDiscover}</button>
+        <button className={activeTab === 'manage' ? 'tab active' : 'tab'} onClick={() => setActiveTab('manage')} type="button"><Icon name="manage" />{he.tabManage}</button>
+        <button className={activeTab === 'driver' ? 'tab active' : 'tab'} onClick={() => setActiveTab('driver')} type="button"><Icon name="driver" />{he.tabDriver}</button>
       </section>
 
       {me ? (
         <section className="card">
-          <h2>Profile Snapshot</h2>
+          <h2>{he.profileSnapshot}</h2>
           <div className="profileGrid">
-            <div className="pill"><span>Name</span><strong>{me.name}</strong></div>
-            <div className="pill"><span>Email</span><strong>{me.email}</strong></div>
-            <div className="pill"><span>Credits</span><strong>{me.credits}</strong></div>
-            <div className="pill"><span>Rating</span><strong>{me.rating_avg}</strong></div>
+            <div className="pill"><span>{he.labelName}</span><strong>{me.name}</strong></div>
+            <div className="pill"><span>{he.labelEmail}</span><strong>{me.email}</strong></div>
+            <div className="pill"><span>{he.labelCredits}</span><strong>{me.credits}</strong></div>
+            <div className="pill"><span>{he.labelRating}</span><strong>{me.rating_avg}</strong></div>
           </div>
         </section>
       ) : null}
 
       {activeTab === 'discover' ? (
         <section className="card">
-          <h2>Search Rides</h2>
+          <h2>{he.searchRidesTitle}</h2>
           <form onSubmit={searchRides}>
-            <input ref={searchOriginRef} placeholder={mapsLoaded ? 'Origin: city or full address' : 'Origin'} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
-            <input ref={searchDestinationRef} placeholder={mapsLoaded ? 'Destination, Any, or leave blank' : 'Destination or Any'} value={search.destination} onChange={(e) => { setSearch({ ...search, destination: e.target.value }); setSearchCoords((prev) => ({ ...prev, destination: null })) }} />
-            <button type="submit" disabled={loading}>Search</button>
+            <input ref={searchOriginRef} placeholder={mapsLoaded ? he.originPh : he.originPhShort} value={search.origin} onChange={(e) => { setSearch({ ...search, origin: e.target.value }); setSearchCoords((prev) => ({ ...prev, origin: null })) }} required />
+            <input ref={searchDestinationRef} placeholder={mapsLoaded ? he.destPh : he.destPhShort} value={search.destination} onChange={(e) => { setSearch({ ...search, destination: e.target.value }); setSearchCoords((prev) => ({ ...prev, destination: null })) }} />
+            <button type="submit" disabled={loading}>{he.searchBtn}</button>
           </form>
-          <p className="empty" style={{ marginTop: '0.5rem' }}>You can type only a city name. For destination, leave empty or type <strong>Any</strong> to see rides to all destinations.</p>
+          <p className="empty" style={{ marginTop: '0.5rem' }}>{he.searchHint}</p>
           <div className="mapWrap">
-            {!mapsApiKey ? <p className="empty">Add `VITE_GOOGLE_MAPS_API_KEY` to enable map and autocomplete.</p> : null}
+            {!mapsApiKey ? <p className="empty">{he.mapsKeyHint}</p> : null}
             {mapsError ? <p className="empty">{mapsError}</p> : null}
             <div ref={searchMapRef} className="mapCanvas" />
           </div>
@@ -546,33 +653,33 @@ function App() {
               <li key={item.id}>
                 <div className="rideBlock">
                   <strong>#{item.id}</strong>
-                  <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">to</span><span className="routeChip">{item.destination}</span></div>
-                  <div className="meta">Seats available: {item.seats_available} | Driver: #{item.driver_id}</div>
+                  <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                  <div className="meta">{he.seatsAvail}: {item.seats_available} · {he.driver} מס׳ {item.driver_id}</div>
                 </div>
                 <div className="actionCol">
-                  <button type="button" onClick={() => requestRide(item.id)} disabled={!token || loading}>Request Match</button>
-                  <button type="button" className="ghost" onClick={() => loadUserRides(item.driver_id)} disabled={loading}>View Driver Rides</button>
+                  <button type="button" onClick={() => requestRide(item.id)} disabled={!token || loading}>{he.requestMatch}</button>
+                  <button type="button" className="ghost" onClick={() => loadUserRides(item.driver_id)} disabled={loading}>{he.viewDriverRides}</button>
                 </div>
               </li>
             ))}
           </ul>
-            {!rides.length ? <p className="empty">No rides yet. Search by origin; destination is optional.</p> : null}
+            {!rides.length ? <p className="empty">{he.emptyDiscover}</p> : null}
 
           {selectedDriverId ? (
             <section className="subCard">
-              <h3>Published rides by user #{selectedDriverId}</h3>
+              <h3>{he.driverRidesTitle} {selectedDriverId}</h3>
               <ul className="results compact">
                 {driverRides.map((item) => (
                   <li key={`driver-${item.id}`}>
                     <div className="rideBlock">
                       <strong>#{item.id}</strong>
-                      <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">to</span><span className="routeChip">{item.destination}</span></div>
-                      <div className="meta">Seats: {item.seats_available} / {item.seats_total}</div>
+                      <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                      <div className="meta">{he.seatsRatio}: {item.seats_available} / {item.seats_total}</div>
                     </div>
                   </li>
                 ))}
               </ul>
-              {!driverRides.length ? <p className="empty">No rides published by this user.</p> : null}
+              {!driverRides.length ? <p className="empty">{he.emptyDriverList}</p> : null}
             </section>
           ) : null}
         </section>
@@ -581,73 +688,73 @@ function App() {
       {activeTab === 'manage' ? (
         <>
           <section className="card">
-            <h2>Publish Ride</h2>
+            <h2>{he.publishTitle}</h2>
             <form onSubmit={publishRide}>
-              <input ref={rideOriginRef} placeholder={mapsLoaded ? 'Origin (autocomplete enabled)' : 'Origin'} value={ride.origin} onChange={(e) => { setRide({ ...ride, origin: e.target.value }); setRideCoords((prev) => ({ ...prev, origin: null })) }} required />
-              <input ref={rideDestinationRef} placeholder={mapsLoaded ? 'Destination (autocomplete enabled)' : 'Destination'} value={ride.destination} onChange={(e) => { setRide({ ...ride, destination: e.target.value }); setRideCoords((prev) => ({ ...prev, destination: null })) }} required />
+              <input ref={rideOriginRef} placeholder={mapsLoaded ? he.originPubPh : he.originPubShort} value={ride.origin} onChange={(e) => { setRide({ ...ride, origin: e.target.value }); setRideCoords((prev) => ({ ...prev, origin: null })) }} required />
+              <input ref={rideDestinationRef} placeholder={mapsLoaded ? he.destPubPh : he.destPubShort} value={ride.destination} onChange={(e) => { setRide({ ...ride, destination: e.target.value }); setRideCoords((prev) => ({ ...prev, destination: null })) }} required />
               <input type="datetime-local" value={ride.departure_time} onChange={(e) => setRide({ ...ride, departure_time: e.target.value })} required />
               <input type="number" min="1" max="8" value={ride.seats_total} onChange={(e) => setRide({ ...ride, seats_total: e.target.value })} required />
-              <button type="submit" disabled={!token || loading}>Publish</button>
+              <button type="submit" disabled={!token || loading}>{he.publishBtn}</button>
             </form>
             <div className="mapWrap">
-              {!mapsApiKey ? <p className="empty">Add `VITE_GOOGLE_MAPS_API_KEY` to enable map and autocomplete.</p> : null}
+              {!mapsApiKey ? <p className="empty">{he.mapsKeyHint}</p> : null}
               {mapsError ? <p className="empty">{mapsError}</p> : null}
               <div ref={rideMapRef} className="mapCanvas" />
             </div>
           </section>
           <section className="card">
-            <h2>My Published Rides</h2>
-            <button onClick={loadMyPublishedRides} disabled={!token || loading}>Load My Rides</button>
+            <h2>{he.myRidesTitle}</h2>
+            <button onClick={loadMyPublishedRides} disabled={!token || loading}>{he.loadMyRides}</button>
             <ul className="results compact">
               {myPublishedRides.map((item) => (
                 <li key={`mine-${item.id}`}>
                   <div className="rideBlock">
                     <strong>#{item.id}</strong>
-                    <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">to</span><span className="routeChip">{item.destination}</span></div>
-                    <div className="meta">Seats: {item.seats_available} / {item.seats_total}</div>
+                    <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                    <div className="meta">{he.seatsRatio}: {item.seats_available} / {item.seats_total}</div>
                   </div>
                   <div className="actionCol">
-                    <button type="button" className="ghost" onClick={() => deleteMyRide(item.id)} disabled={!token || loading}>Delete</button>
+                    <button type="button" className="ghost" onClick={() => deleteMyRide(item.id)} disabled={!token || loading}>{he.deleteRide}</button>
                   </div>
                 </li>
               ))}
             </ul>
-            {!myPublishedRides.length ? <p className="empty">No rides published by you yet.</p> : null}
+            {!myPublishedRides.length ? <p className="empty">{he.emptyMyRides}</p> : null}
           </section>
           <section className="card">
-            <h2>My Match Requests</h2>
-            <button onClick={loadMyRequests} disabled={!token || loading}>Load My Requests</button>
+            <h2>{he.myMatchesTitle}</h2>
+            <button onClick={loadMyRequests} disabled={!token || loading}>{he.loadMyRequests}</button>
             <ul className="results">
               {myRequests.map((item) => (
                 <li key={item.match_id}>
-                  <div><strong>Match #{item.match_id}</strong> for ride #{item.ride_id}<div className="meta">Status: {item.status}</div></div>
+                  <div><strong>{he.matchLine(item.match_id, item.ride_id)}</strong><div className="meta">{he.status}: {matchStatusHe(item.status)}</div></div>
                   {(item.status === 'PENDING' || item.status === 'ACCEPTED') ? (
-                    <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>Cancel</button>
+                    <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>{he.cancelBtn}</button>
                   ) : null}
                 </li>
               ))}
             </ul>
-            {!myRequests.length ? <p className="empty">No match requests yet.</p> : null}
+            {!myRequests.length ? <p className="empty">{he.emptyRequests}</p> : null}
           </section>
         </>
       ) : null}
 
       {activeTab === 'driver' ? (
         <section className="card">
-          <h2>Driver Pending Requests</h2>
-          <button onClick={loadDriverPending} disabled={!token || loading}>Load Pending</button>
+          <h2>{he.driverPendingTitle}</h2>
+          <button onClick={loadDriverPending} disabled={!token || loading}>{he.loadPending}</button>
           <ul className="results">
             {driverPending.map((item) => (
               <li key={item.match_id}>
-                <div><strong>Match #{item.match_id}</strong> for ride #{item.ride_id}<div className="meta">Passenger #{item.passenger_id}</div></div>
+                <div><strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong></div>
                 <div className="actionCol">
-                  <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>Accept</button>
-                  <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>Reject</button>
+                  <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
+                  <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>{he.rejectBtn}</button>
                 </div>
               </li>
             ))}
           </ul>
-          {!driverPending.length ? <p className="empty">No pending approvals.</p> : null}
+          {!driverPending.length ? <p className="empty">{he.emptyPending}</p> : null}
         </section>
       ) : null}
     </main>
