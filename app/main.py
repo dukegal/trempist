@@ -180,16 +180,21 @@ def _search_tokens(text: str) -> list[str]:
 
 
 def _location_matches_column(column, query: str):
-    """Match full substring OR all tokens as substrings (helps city without full street)."""
+    """Flexible location matching for city/full address inputs from autocomplete."""
     q = (query or "").strip().lower()
     if not q:
         return True
     hay = func.lower(column)
+    segments = [part.strip() for part in q.split(",") if part.strip()]
     tokens = _search_tokens(q)
-    if not tokens:
+    strong_tokens = [t for t in tokens if len(t) >= 3]
+    if not segments and not tokens:
         return hay.contains(q)
-    token_conds = [hay.contains(t) for t in tokens]
-    return or_(hay.contains(q), and_(*token_conds))
+    # Keep strong precision match, but also allow segment/token-level match.
+    clauses = [hay.contains(q)]
+    clauses.extend(hay.contains(segment) for segment in segments if len(segment) >= 2)
+    clauses.extend(hay.contains(token) for token in strong_tokens)
+    return or_(*clauses)
 
 
 @app.post("/rides/search", response_model=list[RideOut])
