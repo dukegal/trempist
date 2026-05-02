@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72" aria-hidden="true">
+  <defs>
+    <linearGradient id="trempistLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3ddbff"/>
+      <stop offset="100%" stop-color="#5b4dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="72" height="72" rx="20" fill="url(#trempistLogoGrad)"/>
+  <rect x="12" y="16" width="48" height="12" rx="6" fill="#fff" fill-opacity="0.95"/>
+  <rect x="30" y="22" width="12" height="36" rx="6" fill="#fff" fill-opacity="0.95"/>
+</svg>

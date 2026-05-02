@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+const BRAND = 'TREMPIST'
 
 /** ממשק בעברית */
 const he = {
-  appName: 'טרמפיסט',
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
-  welcome: 'ברוכים הבאים לטרמפיסט',
+  welcome: 'ברוכים הבאים',
   authSubtitle: 'התחברו כדי לחפש נסיעות, לנהל התאמות ולצפות בפרופיל.',
   loginTab: 'התחברות',
   signupTab: 'הרשמה',
   loginBtn: 'התחבר',
   createAccount: 'יצירת חשבון',
-  tagline: 'טרמפים קהילתיים עם נקודות זכות',
+  tagline: 'שיתוף טרמפים, ללא תשלום.',
   apiLabel: 'שרת',
   themeDark: 'מצב כהה',
   themeLight: 'מצב בהיר',
@@ -28,7 +28,7 @@ const he = {
   ridesFound: 'נסיעות בתוצאות',
   myRequestsStat: 'בקשות שלי',
   pendingApprovals: 'ממתינים לאישור',
-  tabDiscover: 'גילוי',
+  tabDiscover: 'גלה',
   tabManage: 'ניהול',
   tabDriver: 'נהג',
   profileSnapshot: 'פרופיל',
@@ -277,7 +277,7 @@ function App() {
       directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
         map,
         suppressMarkers: true,
-        polylineOptions: { strokeColor: '#1d4ed8', strokeWeight: 5, strokeOpacity: 0.8 },
+        polylineOptions: { strokeColor: '#00b4e6', strokeWeight: 6, strokeOpacity: 0.92 },
       })
     }
     directionsServiceRef.current.route(
@@ -554,7 +554,12 @@ function App() {
       <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
         <section className="authScreen">
           <div className="authCard">
-            <h1>{he.appName}</h1>
+            <div className="brandBlock">
+              <img src="/logo.svg" alt="" className="brandLogo" width={52} height={52} />
+              <div className="brandText">
+                <h1 className="brandWordmark">{BRAND}</h1>
+              </div>
+            </div>
             <p className="sub">{he.authSubtitle}</p>
             {message ? <p className="message">{message}</p> : null}
             <div className="authSwitch">
@@ -586,8 +591,13 @@ function App() {
     <main className={rootClassName} dir={isRtl ? 'rtl' : 'ltr'}>
       <header className="hero">
         <div>
-          <h1>{he.appName}</h1>
-          <p className="sub">{he.tagline}</p>
+          <div className="brandBlock">
+            <img src="/logo.svg" alt="" className="brandLogo" width={56} height={56} />
+            <div className="brandText">
+              <h1 className="brandWordmark">{BRAND}</h1>
+              <p className="sub">{he.tagline}</p>
+            </div>
+          </div>
           <p className="api">{he.apiLabel}: {API_BASE_URL}</p>
         </div>
         <div className="statusWrap controls">
