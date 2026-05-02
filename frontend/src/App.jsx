@@ -32,9 +32,9 @@ const he = {
   ridesFound: 'נסיעות בתוצאות',
   myRequestsStat: 'הבקשות שלי',
   pendingApprovals: 'ממתינים לאישור',
-  tabDiscover: 'גלה',
-  tabManage: 'חיפוש טרמפ',
-  tabDriver: 'הצע טרמפ',
+  tabDiscover: 'חפש טרמפ',
+  tabManage: 'פרסם טרמפ',
+  tabDriver: 'בקשות',
   labelName: 'שם',
   labelEmail: 'אימייל',
   password: 'סיסמה',
@@ -791,6 +791,11 @@ function App() {
             </ul>
             {!myPublishedRides.length ? <p className="empty">{he.emptyMyRides}</p> : null}
           </section>
+        </>
+      ) : null}
+
+      {activeTab === 'driver' ? (
+        <>
           <section className="card cardPanel">
             <h2>{he.myMatchesTitle}</h2>
             <button onClick={loadMyRequests} disabled={!token || loading}>{he.loadMyRequests}</button>
@@ -838,32 +843,6 @@ function App() {
             {!driverPending.length ? <p className="empty">{he.noIncomingRequests}</p> : null}
           </section>
         </>
-      ) : null}
-
-      {activeTab === 'driver' ? (
-        <section className="card cardPanel">
-          <h2>{he.driverPendingTitle}</h2>
-          <button onClick={loadDriverPending} disabled={!token || loading}>{he.loadPending}</button>
-          <ul className="results">
-            {driverPending.map((item) => (
-              <li key={item.match_id}>
-                <div>
-                  <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
-                  {(item.origin && item.destination) ? (
-                    <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
-                  ) : null}
-                  <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
-                  <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
-                </div>
-                <div className="actionCol">
-                  <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
-                  <button type="button" className="ghost" onClick={() => rejectMatch(item.match_id)} disabled={loading}>{he.rejectBtn}</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {!driverPending.length ? <p className="empty">{he.emptyPending}</p> : null}
-        </section>
       ) : null}
     </main>
   )
