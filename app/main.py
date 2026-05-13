@@ -32,7 +32,10 @@ from app.schemas import (
 )
 
 # יצירת כל הטבלאות אם לא קיימות — SQLAlchemy עושה זאת אוטומטית
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as _create_err:
+    print(f"[startup] create_all skipped: {_create_err}")
 
 
 def ensure_match_lifecycle_columns():
@@ -57,7 +60,12 @@ def ensure_match_lifecycle_columns():
             conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
 
 
-ensure_match_lifecycle_columns()
+try:
+    ensure_match_lifecycle_columns()
+except Exception as _migration_err:
+    # אם ה-DB לא זמין בזמן האתחול — ממשיכים בכל זאת.
+    # ה-endpoint הראשון יכשל עם שגיאה ברורה במקום לקרוס את כל השרת.
+    print(f"[startup] DB migration skipped: {_migration_err}")
 
 # יצירת אפליקציית FastAPI עם שם לתיעוד Swagger
 app = FastAPI(title="טרמפיסט — API")
