@@ -9,23 +9,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
-// לקוח Socket לאימות — מיובא באופן lazy לפי צורך
-import SocketAuthClient from './auth/SocketAuthClient.js'
-
-/**
- * פונקציית עזר: פתח חיבור socket, בצע פעולה אחת, סגור.
- * @param {(client: SocketAuthClient) => Promise<any>} action
- */
-async function withSocketAuth(action) {
-  const client = new SocketAuthClient()
-  await client.connect()
-  try {
-    return await action(client)
-  } finally {
-    client.disconnect()
-  }
-}
-
 // ---------------------------------------------------------------
 // אובייקט עברית — כל מחרוזות הממשק במקום אחד
 // הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
@@ -466,10 +449,7 @@ function App() {
     const displayName = auth.name.trim()
     await withLoading(async () => {
       try {
-        // Primary path: raw socket → /ws/auth → TCP AuthServer
-        const data = await withSocketAuth((client) =>
-          client.register({ name: auth.name, email: auth.email, phone: auth.phone, password: auth.password })
-        )
+        const data = await callApi('/auth/register', 'POST', auth)
         localStorage.setItem('token', data.token)
         setAuth({ name: '', phone: '', email: '', password: '' })
         setMe(null)
@@ -486,10 +466,7 @@ function App() {
     event.preventDefault()
     await withLoading(async () => {
       try {
-        // Primary path: raw socket → /ws/auth → TCP AuthServer
-        const data = await withSocketAuth((client) =>
-          client.login({ email: login.email, password: login.password })
-        )
+        const data = await callApi('/auth/login', 'POST', login)
         localStorage.setItem('token', data.token)
         setToken(data.token)
         setMe(null)

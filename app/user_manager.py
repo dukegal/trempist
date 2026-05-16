@@ -25,7 +25,7 @@ import threading
 
 from sqlalchemy.orm import Session
 
-from app.auth import create_token
+from app.auth import create_token, verify_password
 from app.models import User
 
 # ── Server-side pepper ────────────────────────────────────────────────────────
@@ -124,25 +124,24 @@ class UserManager:
             raise LoginError("אימייל וסיסמה נדרשים")
 
         with _get_lock(email):
-            # Parameterised ORM query — safe from SQL injection
             user: User | None = self._db.query(User).filter(User.email == email).first()
 
-            # Always compute a hash (even for unknown users) to prevent
-            # timing-based user-enumeration attacks.
             dummy_salt = "0" * 64
-            stored     = user.password_hash if user else f"{dummy_salt}${"0" * 64}"
+            dummy_target = self._hash_password("__wrong__", dummy_salt)
 
-            try:
-                salt, stored_dk = stored.split("$", 1)
-            except ValueError:
-                # Legacy passlib format — not supported by the new socket auth
-                salt      = dummy_salt
-                stored_dk = "legacy"
-
-            computed = self._hash_password(password, salt)
-
-            # Constant-time comparison — prevents timing attacks
-            credentials_ok = hmac.compare_digest(computed, stored_dk)
+            credentials_ok = False
+            if user:
+                ph = user.password_hash or ""
+                if self._is_pepper_record(ph):
+                    salt, stored_dk = ph.split("$", 1)
+                    computed = self._hash_password(password, salt)
+                    credentials_ok = hmac.compare_digest(computed, stored_dk)
+                else:
+                    # משתמשים שנרשמו לפני פורמט salt$hash+pepper — פורמט passlib
+                    credentials_ok = verify_password(password, ph)
+            else:
+                computed = self._hash_password(password, dummy_salt)
+                credentials_ok = hmac.compare_digest(computed, dummy_target)
 
             if not user or not credentials_ok:
                 raise LoginError("אימייל או סיסמה שגויים")
@@ -152,6 +151,21 @@ class UserManager:
 
         token = create_token(user.id)
         return {"token": token, "user_id": user.id, "name": user.name}
+
+    @staticmethod
+    def _is_pepper_record(password_hash: str) -> bool:
+        """פורמט חדש: 64 תווי hex (salt) + '$' + גיבוב hex."""
+        if password_hash.count("$") != 1:
+            return False
+        salt, digest = password_hash.split("$", 1)
+        if len(salt) != 64:
+            return False
+        try:
+            int(salt, 16)
+            int(digest, 16)
+        except ValueError:
+            return False
+        return True
 
     # ── Private helpers ───────────────────────────────────────────
 

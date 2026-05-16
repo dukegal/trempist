@@ -206,3 +206,16 @@ class AuthServer:
                 handler.start()
             except OSError:
                 break   # server socket closed — normal shutdown
+
+
+if __name__ == "__main__":
+    """
+    הרצה עצמאית של שרת האימות ב-TCP גולמי (ללא FastAPI).
+    פורט ברירת מחדל: 9000 — הגדר AUTH_SOCKET_HOST / AUTH_SOCKET_PORT.
+    """
+    server = AuthServer()
+    server.start()
+    try:
+        threading.Event().wait()
+    except KeyboardInterrupt:
+        server.stop()
