@@ -1,9 +1,35 @@
+// ===============================================================
+// App.jsx — קומפוננטה ראשית של TREMPIST Frontend
+// כולל: state management, API calls, Google Maps, UI rendering
+// ===============================================================
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+// כתובת ה-API — מגיעה מ-.env.local בפיתוח, ומ-Vercel env בייצור
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
-/** ממשק בעברית */
+// לקוח Socket לאימות — מיובא באופן lazy לפי צורך
+import SocketAuthClient from './auth/SocketAuthClient.js'
+
+/**
+ * פונקציית עזר: פתח חיבור socket, בצע פעולה אחת, סגור.
+ * @param {(client: SocketAuthClient) => Promise<any>} action
+ */
+async function withSocketAuth(action) {
+  const client = new SocketAuthClient()
+  await client.connect()
+  try {
+    return await action(client)
+  } finally {
+    client.disconnect()
+  }
+}
+
+// ---------------------------------------------------------------
+// אובייקט עברית — כל מחרוזות הממשק במקום אחד
+// הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
+// ---------------------------------------------------------------
 const he = {
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
@@ -151,14 +177,18 @@ function Icon({ name }) {
   )
 }
 
+// ---------------------------------------------------------------
+// useGoogleMaps — Hook לטעינת Google Maps API
+// טוען את הסקריפט פעם אחת ומדווח על מוכנות
+// ---------------------------------------------------------------
 function useGoogleMaps(apiKey) {
   const [loaded, setLoaded] = useState(Boolean(window.google?.maps?.places))
   const [error, setError] = useState('')
   useEffect(() => {
-    if (!apiKey) return
+    if (!apiKey) return  // אם אין מפתח — לא טוענים
     if (window.google?.maps?.places) {
       setLoaded(true)
-      return
+      return  // כבר נטען בעבר
     }
     const scriptId = 'google-maps-script'
     const existing = document.getElementById(scriptId)
@@ -166,23 +196,28 @@ function useGoogleMaps(apiKey) {
       existing.addEventListener('load', () => setLoaded(true))
       return
     }
+    // יצירת תג script דינמי לטעינת Google Maps
     const script = document.createElement('script')
     script.id = scriptId
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
     script.async = true
     script.defer = true
-    script.onload = () => setLoaded(true)
-    script.onerror = () => setError(he.mapsLoadError)
+    script.onload = () => setLoaded(true)   // הצלחה
+    script.onerror = () => setError(he.mapsLoadError)  // כישלון
     document.body.appendChild(script)
   }, [apiKey])
   return { loaded, error }
 }
 
+// ---------------------------------------------------------------
+// App — קומפוננטה ראשית
+// ---------------------------------------------------------------
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('token') || '')
+  // --- State Management ---
+  const [token, setToken] = useState(localStorage.getItem('token') || '')  // JWT שמור
   const [message, setMessage] = useState(he.welcome)
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('discover')
+  const [activeTab, setActiveTab] = useState('discover')  // טאב פעיל
   const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -199,15 +234,15 @@ function App() {
   })
   const [rideCoords, setRideCoords] = useState({ origin: null, destination: null })
   const [searchCoords, setSearchCoords] = useState({ origin: null, destination: null })
-  const [me, setMe] = useState(null)
-  const [rides, setRides] = useState([])
+  const [me, setMe] = useState(null)           // פרטי המשתמש המחובר
+  const [rides, setRides] = useState([])        // תוצאות חיפוש
   const [driverRides, setDriverRides] = useState([])
   const [selectedDriverId, setSelectedDriverId] = useState(null)
-  const [myRequests, setMyRequests] = useState([])
-  const [driverPending, setDriverPending] = useState([])
+  const [myRequests, setMyRequests] = useState([])   // הבקשות שלי כנוסע
+  const [driverPending, setDriverPending] = useState([])  // בקשות ממתינות כנהג
   const [myPublishedRides, setMyPublishedRides] = useState([])
-  const [driverActive, setDriverActive] = useState([])
-  const [creditsLog, setCreditsLog] = useState([])
+  const [driverActive, setDriverActive] = useState([])    // נסיעות פעילות כנהג
+  const [creditsLog, setCreditsLog] = useState([])        // היסטוריית קרדיטים
   const [notifications, setNotifications] = useState([])
 
   const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
@@ -227,6 +262,7 @@ function App() {
   const searchDirectionsService = useRef(null)
   const rideDirectionsService = useRef(null)
 
+  // headers מחושבים מהטוקן — מתעדכנים רק כשהטוקן משתנה
   const headers = useMemo(() => {
     const t = token || localStorage.getItem('token')
     if (!t) return { 'Content-Type': 'application/json' }
@@ -262,8 +298,12 @@ function App() {
     }
   }
 
+  // ---------------------------------------------------------------
+  // callApi — פונקציית תקשורת מרכזית
+  // ---------------------------------------------------------------
   async function callApi(path, method = 'GET', body = null, useAuth = false) {
     const authToken = localStorage.getItem('token') || token
+    // בניית headers — הוספת JWT רק לבקשות מאומתות
     const requestHeaders = useAuth
       ? {
           'Content-Type': 'application/json',
@@ -275,8 +315,9 @@ function App() {
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : null,
     })
-    const data = await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => ({}))  // catch למקרה תגובה לא-JSON
     if (!response.ok) {
+      // חילוץ הודעת שגיאה בעברית מהשרת
       const detail = data?.detail?.message || data?.detail || he.requestFailed
       throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
     }
@@ -425,7 +466,10 @@ function App() {
     const displayName = auth.name.trim()
     await withLoading(async () => {
       try {
-        const data = await callApi('/auth/register', 'POST', auth)
+        // Primary path: raw socket → /ws/auth → TCP AuthServer
+        const data = await withSocketAuth((client) =>
+          client.register({ name: auth.name, email: auth.email, phone: auth.phone, password: auth.password })
+        )
         localStorage.setItem('token', data.token)
         setAuth({ name: '', phone: '', email: '', password: '' })
         setMe(null)
@@ -442,7 +486,10 @@ function App() {
     event.preventDefault()
     await withLoading(async () => {
       try {
-        const data = await callApi('/auth/login', 'POST', login)
+        // Primary path: raw socket → /ws/auth → TCP AuthServer
+        const data = await withSocketAuth((client) =>
+          client.login({ email: login.email, password: login.password })
+        )
         localStorage.setItem('token', data.token)
         setToken(data.token)
         setMe(null)

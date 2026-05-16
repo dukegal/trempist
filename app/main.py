@@ -3,19 +3,23 @@
 # כולל: הגדרות, middleware, endpoints, utilities
 # ===============================================================
 
+import asyncio
 import re
+import struct
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 import os
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, delete, func, inspect, or_, select, text
 from sqlalchemy.orm import Session
 
-from app.auth import create_token, decode_token, hash_password, verify_password
+from app.auth import create_token, decode_token
+from app.auth_socket_server import AUTH_HOST, AUTH_PORT, AuthServer
 from app.database import Base, engine, get_db
 from app.models import CreditsLog, Match, MatchStatus, Rating, Ride, RideStatus, User
 from app.schemas import (
@@ -30,6 +34,7 @@ from app.schemas import (
     TokenOut,
     UserOut,
 )
+from app.user_manager import LoginError, RegistrationError, UserManager
 
 # יצירת כל הטבלאות אם לא קיימות — SQLAlchemy עושה זאת אוטומטית
 try:
@@ -67,8 +72,20 @@ except Exception as _migration_err:
     # ה-endpoint הראשון יכשל עם שגיאה ברורה במקום לקרוס את כל השרת.
     print(f"[startup] DB migration skipped: {_migration_err}")
 
+# ── Auth socket server — started once at process boot ─────────────────────────
+_auth_server = AuthServer()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Start the raw-socket auth server before accepting HTTP/WS traffic."""
+    _auth_server.start()
+    yield
+    _auth_server.stop()
+
+
 # יצירת אפליקציית FastAPI עם שם לתיעוד Swagger
-app = FastAPI(title="טרמפיסט — API")
+app = FastAPI(title="טרמפיסט — API", lifespan=lifespan)
 
 # TTL לבקשות ממתינות — ניתן לשינוי דרך משתני סביבה
 MATCH_REQUEST_TTL_HOURS = int(os.getenv("MATCH_REQUEST_TTL_HOURS", "24"))
@@ -161,47 +178,90 @@ def health():
 
 # ---------------------------------------------------------------
 # אימות — הרשמה וכניסה
+#
+# Primary path: socket-based via /ws/auth (see WebSocket proxy below).
+# Fallback HTTP endpoints kept for compatibility with curl/Swagger testing.
+# Both paths use the same UserManager with identical PBKDF2+salt+pepper logic.
 # ---------------------------------------------------------------
 
 @app.post("/auth/register", response_model=TokenOut)
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
-    """
-    הרשמת משתמש חדש.
-    בודק שהאימייל לא קיים, מצפין סיסמה, יוצר משתמש ומחזיר JWT.
-    """
-    # בדיקת כפילות אימייל
-    existing = db.scalar(select(User).where(User.email == payload.email))
-    if existing:
-        api_error(status.HTTP_400_BAD_REQUEST, "E002", "כתובת האימייל כבר רשומה במערכת")
-
-    # יצירת משתמש חדש עם סיסמה מוצפנת
-    user = User(
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
-        password_hash=hash_password(payload.password),  # הצפנה!
-        credits=0,  # משתמש חדש מתחיל ב-0 קרדיטים
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    # מחזירים JWT מיידית — המשתמש מחובר אוטומטית לאחר הרשמה
-    return {"token": create_token(user.id), "user_id": user.id}
+    """הרשמת משתמש חדש (HTTP fallback — הנתיב הראשי הוא WebSocket /ws/auth)."""
+    try:
+        result = UserManager(db).register(
+            name=payload.name, email=payload.email,
+            phone=payload.phone, password=payload.password,
+        )
+        return {"token": result["token"], "user_id": result["user_id"]}
+    except RegistrationError as e:
+        api_error(status.HTTP_400_BAD_REQUEST, "E002", str(e))
 
 
 @app.post("/auth/login", response_model=TokenOut)
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    """
-    כניסת משתמש קיים.
-    בודק אימייל, מאמת סיסמה, מחזיר JWT.
-    """
-    user = db.scalar(select(User).where(User.email == payload.email))
-    # שגיאה זהה לאימייל שגוי וסיסמה שגויה — מונע User Enumeration
-    if not user or not verify_password(payload.password, user.password_hash):
-        api_error(status.HTTP_401_UNAUTHORIZED, "E001", "אימייל או סיסמה שגויים")
-    if user.is_blocked:
-        api_error(status.HTTP_403_FORBIDDEN, "E012", "המשתמש חסום")
-    return {"token": create_token(user.id), "user_id": user.id}
+    """כניסת משתמש קיים (HTTP fallback — הנתיב הראשי הוא WebSocket /ws/auth)."""
+    try:
+        result = UserManager(db).login(email=payload.email, password=payload.password)
+        return {"token": result["token"], "user_id": result["user_id"]}
+    except LoginError as e:
+        api_error(status.HTTP_401_UNAUTHORIZED, "E001", str(e))
+
+
+# ---------------------------------------------------------------
+# WebSocket Proxy — Browser ↔ Raw TCP Auth Server
+#
+# Browsers cannot open raw TCP sockets, so this endpoint acts as a
+# transparent relay:
+#
+#   Browser  ──WSS──►  /ws/auth  ──TCP──►  AuthServer (port 9000)
+#
+# Frame translation:
+#   TCP → WS :  read [4-byte-len | payload], send payload as binary WS frame
+#   WS → TCP :  receive binary frame, prepend 4-byte length, write to TCP
+#
+# The first TCP frame (HELLO) is plaintext JSON with the session key.
+# All subsequent frames are AES-256-GCM encrypted (handled transparently).
+# ---------------------------------------------------------------
+
+@app.websocket("/ws/auth")
+async def auth_ws_proxy(ws: WebSocket):
+    """Transparent relay between the browser WebSocket and the raw TCP auth server."""
+    await ws.accept()
+
+    try:
+        reader, writer = await asyncio.open_connection(AUTH_HOST, AUTH_PORT)
+    except OSError:
+        await ws.send_json({"cmd": "RESPONSE", "ok": False, "error": "Auth server unavailable"})
+        await ws.close()
+        return
+
+    async def tcp_to_ws():
+        """Forward one TCP frame (strip length header) → one WS binary message."""
+        try:
+            while True:
+                raw_len  = await reader.readexactly(4)
+                (length,) = struct.unpack(">I", raw_len)
+                payload  = await reader.readexactly(length)
+                await ws.send_bytes(payload)
+        except (asyncio.IncompleteReadError, WebSocketDisconnect, RuntimeError):
+            pass
+
+    async def ws_to_tcp():
+        """Forward one WS binary message → one TCP frame (add length header)."""
+        try:
+            while True:
+                data = await ws.receive_bytes()
+                writer.write(struct.pack(">I", len(data)) + data)
+                await writer.drain()
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+
+    await asyncio.gather(tcp_to_ws(), ws_to_tcp(), return_exceptions=True)
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except OSError:
+        pass
 
 
 @app.get("/users/me", response_model=UserOut)
