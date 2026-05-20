@@ -4,7 +4,7 @@
 # ===============================================================
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from typing import Annotated
 
@@ -228,33 +228,85 @@ def publish_ride(
 def _destination_is_any(value: str) -> bool:
     """בודק אם המשתמש חיפש "כל היעדים" — ריק, any, * וכו'"""
     v = (value or "").strip().lower()
-    return v in ("", "any", "*", "all", "everywhere", "כל", "הכל")
+    return v in ("", "any", "*", "all", "everywhere", "כל", "הכל", "כל היעדים", "any destination")
+
+
+# ערים נפוצות — מקבילות עברית/אנגלית (Google Autocomplete מחזיר לפעמים באנגלית)
+_LOCATION_GROUPS: tuple[frozenset[str], ...] = (
+    frozenset({"tel aviv", "tel aviv yafo", "tlv", "תל אביב", "תל אביב יפו", "תל אביב-יפו"}),
+    frozenset({"jerusalem", "ירושלים"}),
+    frozenset({"haifa", "חיפה"}),
+    frozenset({"beer sheva", "beersheba", "be er sheva", "באר שבע"}),
+    frozenset({"netanya", "נתניה"}),
+    frozenset({"ashdod", "אשדוד"}),
+    frozenset({"rishon lezion", "rishon le zion", "ראשון לציון"}),
+    frozenset({"petah tikva", "petach tikva", "פתח תקווה"}),
+    frozenset({"holon", "חולון"}),
+    frozenset({"bnei brak", "bnei braq", "בני ברק"}),
+    frozenset({"ramat gan", "רמת גן"}),
+    frozenset({"herzliya", "הרצליה"}),
+    frozenset({"modiin", "modi in", "מודיעין"}),
+    frozenset({"eilat", "אילת"}),
+)
+
+
+def _normalize_location_text(value: str) -> str:
+    text = (value or "").strip().lower()
+    for suffix in (", israel", ", ישראל", ", il"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+    text = text.replace("-", " ")
+    return re.sub(r"\s+", " ", text)
 
 
 def _search_tokens(text: str) -> list[str]:
     """מפצל שאילתת חיפוש לאסימונות (מילים)"""
-    parts = re.split(r"[\s,]+", (text or "").strip().lower())
+    parts = re.split(r"[\s,]+", _normalize_location_text(text))
     return [p for p in parts if p]
+
+
+def _location_search_terms(query: str) -> list[str]:
+    """מייצר variants לחיפוש — כולל מקבילות עברית/אנגלית לערים."""
+    q = _normalize_location_text(query)
+    if not q:
+        return []
+
+    terms = {q}
+    terms.update(part.strip() for part in q.split(",") if len(part.strip()) >= 2)
+    terms.update(t for t in _search_tokens(q) if len(t) >= 2)
+
+    for group in _LOCATION_GROUPS:
+        normalized_group = {_normalize_location_text(item) for item in group}
+        matched = any(
+            term == loc or term in loc or loc in term
+            for term in terms
+            for loc in normalized_group
+        )
+        if matched:
+            terms.update(normalized_group)
+
+    return [t for t in terms if len(t) >= 2]
 
 
 def _location_matches_column(column, query: str):
     """
     בונה תנאי SQL גמיש לחיפוש כתובת.
-    בודק: התאמה מלאה | לפי segment | לפי token בודד.
+    בודק: התאמה מלאה | לפי segment | לפי token | מקבילות עיר בעברית/אנגלית.
     """
-    q = (query or "").strip().lower()
-    if not q:
+    terms = _location_search_terms(query)
+    if not terms:
         return True  # ריק = אין סינון
     hay = func.lower(column)
-    segments = [part.strip() for part in q.split(",") if part.strip()]
-    tokens = _search_tokens(q)
-    strong_tokens = [t for t in tokens if len(t) >= 3]
-    if not segments and not tokens:
-        return hay.contains(q)
-    clauses = [hay.contains(q)]  # התאמה מלאה
-    clauses.extend(hay.contains(segment) for segment in segments if len(segment) >= 2)
-    clauses.extend(hay.contains(token) for token in strong_tokens)
-    return or_(*clauses)  # כל אחד מספיק
+    return or_(*[hay.contains(term) for term in terms])
+
+
+def _as_utc_naive(value: datetime | None) -> datetime | None:
+    """ממיר datetime עם/בלי timezone להשוואה עקבית מול utcnow()."""
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 @app.post("/rides/search", response_model=list[RideOut])
@@ -263,7 +315,10 @@ def search_rides(payload: RideSearchIn, db: Session = Depends(get_db)):
     חיפוש נסיעות פתוחות.
     אין צורך באימות — חיפוש זמין לכולם.
     """
-    now_minus = datetime.utcnow() - timedelta(hours=1)  # כולל נסיעות שהתחילו עכשיו
+    now_utc = datetime.utcnow()
+    now_minus = now_utc - timedelta(hours=1)  # כולל נסיעות שהתחילו עכשיו
+    departure_from = _as_utc_naive(payload.departure_from)
+    departure_to = _as_utc_naive(payload.departure_to)
 
     # בניית רשימת פילטרים
     filters = [
@@ -278,12 +333,12 @@ def search_rides(payload: RideSearchIn, db: Session = Depends(get_db)):
         filters.append(_location_matches_column(Ride.destination, payload.destination))
 
     # פילטרי שעה — אופציונליים
-    if payload.departure_from:
-        filters.append(Ride.departure_time >= payload.departure_from)
-    if payload.departure_to:
-        filters.append(Ride.departure_time <= payload.departure_to)
+    if departure_from:
+        filters.append(Ride.departure_time >= departure_from)
+    if departure_to:
+        filters.append(Ride.departure_time <= departure_to)
     if payload.leaving_soon_hours:
-        filters.append(Ride.departure_time <= datetime.utcnow() + timedelta(hours=payload.leaving_soon_hours))
+        filters.append(Ride.departure_time <= now_utc + timedelta(hours=payload.leaving_soon_hours))
 
     # מיון דינמי לפי בחירת המשתמש
     sort_key = (payload.sort_by or "departure_asc").strip().lower()

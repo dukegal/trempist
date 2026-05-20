@@ -182,7 +182,7 @@ function useGoogleMaps(apiKey) {
     // יצירת תג script דינמי לטעינת Google Maps
     const script = document.createElement('script')
     script.id = scriptId
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=he&region=IL`
     script.async = true
     script.defer = true
     script.onload = () => setLoaded(true)   // הצלחה
