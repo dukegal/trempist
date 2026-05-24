@@ -863,6 +863,71 @@ button:disabled {
   font-weight: 500;
 }
 
+.fieldLabel {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 4px 0 6px;
+}
+
+.travelConfirmation {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.12) 0%, rgba(30, 200, 255, 0.1) 100%);
+  border: 2px solid rgba(46, 204, 113, 0.35);
+}
+
+.theme-dark .travelConfirmation {
+  background: rgba(46, 204, 113, 0.08);
+  border-color: rgba(46, 204, 113, 0.28);
+}
+
+.travelConfirmation h4 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.travelConfirmationRoute {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+}
+
+.travelConfirmationGrid {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.travelConfirmationGrid > div {
+  display: grid;
+  grid-template-columns: minmax(88px, 34%) 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.travelConfirmationGrid dt {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.travelConfirmationGrid dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.travelConfirmationGrid a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .subCard {
   margin-top: 16px;
   background: linear-gradient(135deg, rgba(30, 200, 255, 0.08) 0%, rgba(255, 224, 102, 0.12) 100%);

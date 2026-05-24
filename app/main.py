@@ -131,6 +131,40 @@ def expire_stale_matches(db: Session):
         db.commit()
 
 
+def _match_payload(
+    match: Match,
+    ride: Ride | None,
+    driver: User | None,
+    passenger: User | None,
+    *,
+    share_phones: str = "none",
+) -> dict:
+    """
+    Build match JSON for the frontend.
+    share_phones: "none" | "passenger" (driver sees pending request) | "all" (confirmed trip).
+    """
+    status = match.status.value if hasattr(match.status, "value") else str(match.status)
+    payload = {
+        "match_id": match.id,
+        "ride_id": match.ride_id,
+        "status": status,
+        "origin": ride.origin if ride else None,
+        "destination": ride.destination if ride else None,
+        "driver_id": ride.driver_id if ride else None,
+        "driver_name": driver.name if driver else None,
+        "passenger_id": match.passenger_id,
+        "passenger_name": passenger.name if passenger else None,
+        "departure_time": ride.departure_time.isoformat() if ride and ride.departure_time else None,
+        "expires_at": match.expires_at.isoformat() if match.expires_at else None,
+        "confirmed_at": match.responded_at.isoformat() if match.responded_at else None,
+    }
+    if share_phones in ("passenger", "all") and passenger:
+        payload["passenger_phone"] = passenger.phone
+    if share_phones == "all" and driver:
+        payload["driver_phone"] = driver.phone
+    return payload
+
+
 def get_current_user(
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     db: Session = Depends(get_db),
@@ -479,7 +513,9 @@ def accept_match(
     ride.status = RideStatus.MATCHED if ride.seats_available == 0 else RideStatus.OPEN
 
     db.commit()
-    return {"status": match.status, "ride_id": ride.id}
+    db.refresh(match)
+    driver = db.get(User, ride.driver_id)
+    return _match_payload(match, ride, driver, passenger, share_phones="all")
 
 
 @app.get("/matches/my-requests")
@@ -492,20 +528,8 @@ def my_match_requests(db: Session = Depends(get_db), current_user: User = Depend
         ride = db.get(Ride, match.ride_id)
         driver = db.get(User, ride.driver_id) if ride else None
         passenger = db.get(User, match.passenger_id)
-        result.append(
-            {
-                "match_id": match.id,
-                "ride_id": match.ride_id,
-                "status": match.status,
-                "expires_at": match.expires_at.isoformat() if match.expires_at else None,
-                "origin": ride.origin if ride else None,
-                "destination": ride.destination if ride else None,
-                "driver_id": ride.driver_id if ride else None,
-                "driver_name": driver.name if driver else None,
-                "passenger_id": match.passenger_id,
-                "passenger_name": passenger.name if passenger else None,
-            }
-        )
+        phones = "all" if match.status in (MatchStatus.ACCEPTED, MatchStatus.COMPLETED) else "none"
+        result.append(_match_payload(match, ride, driver, passenger, share_phones=phones))
     return result
 
 
@@ -529,18 +553,7 @@ def driver_pending_matches(db: Session = Depends(get_db), current_user: User = D
         ride = db.get(Ride, match.ride_id)
         passenger = db.get(User, match.passenger_id)
         driver = db.get(User, ride.driver_id) if ride else None
-        result.append(
-            {
-                "match_id": match.id,
-                "ride_id": match.ride_id,
-                "passenger_id": match.passenger_id,
-                "passenger_name": passenger.name if passenger else None,
-                "driver_id": ride.driver_id if ride else None,
-                "driver_name": driver.name if driver else None,
-                "origin": ride.origin if ride else None,
-                "destination": ride.destination if ride else None,
-            }
-        )
+        result.append(_match_payload(match, ride, driver, passenger, share_phones="passenger"))
     return result
 
 
@@ -563,19 +576,7 @@ def driver_active_matches(db: Session = Depends(get_db), current_user: User = De
         ride = db.get(Ride, match.ride_id)
         passenger = db.get(User, match.passenger_id)
         driver = db.get(User, ride.driver_id) if ride else None
-        result.append(
-            {
-                "match_id": match.id,
-                "ride_id": match.ride_id,
-                "passenger_id": match.passenger_id,
-                "passenger_name": passenger.name if passenger else None,
-                "driver_id": ride.driver_id if ride else None,
-                "driver_name": driver.name if driver else None,
-                "origin": ride.origin if ride else None,
-                "destination": ride.destination if ride else None,
-                "status": match.status,
-            }
-        )
+        result.append(_match_payload(match, ride, driver, passenger, share_phones="all"))
     return result
 
 

@@ -127,6 +127,12 @@ const he = {
   routeLabel: 'מסלול',
   driverNameLabel: 'נהג',
   passengerNameLabel: 'נוסע',
+  driverPhoneLabel: 'טלפון נהג',
+  passengerPhoneLabel: 'טלפון נוסע',
+  meetingTimeLabel: 'שעת המפגש',
+  publishMeetingTimeLabel: 'תאריך ושעת המפגש',
+  travelConfirmationTitle: 'אישור נסיעה',
+  travelConfirmedAt: 'אושר ב',
   creditIn: 'זיכוי',
   creditOut: 'חיוב',
   atTime: (iso) => `בתאריך ${new Date(iso).toLocaleString('he-IL')}`,
@@ -142,6 +148,83 @@ function matchStatusHe(s) {
     EXPIRED: 'פג תוקף',
   }
   return m[s] || s
+}
+
+function formatMeetingTime(iso) {
+  if (!iso) return '-'
+  return new Date(iso).toLocaleString('he-IL', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function TravelConfirmation({ item }) {
+  if (item.status !== 'ACCEPTED' && item.status !== 'COMPLETED') return null
+  return (
+    <div className="travelConfirmation">
+      <h4>{he.travelConfirmationTitle}</h4>
+      {(item.origin && item.destination) ? (
+        <div className="travelConfirmationRoute">
+          {item.origin} {he.routeSep} {item.destination}
+        </div>
+      ) : null}
+      <dl className="travelConfirmationGrid">
+        <div>
+          <dt>{he.meetingTimeLabel}</dt>
+          <dd>{formatMeetingTime(item.departure_time)}</dd>
+        </div>
+        <div>
+          <dt>{he.driverNameLabel}</dt>
+          <dd>{item.driver_name || '-'}</dd>
+        </div>
+        <div>
+          <dt>{he.driverPhoneLabel}</dt>
+          <dd>
+            {item.driver_phone ? (
+              <a href={`tel:${item.driver_phone}`}>{item.driver_phone}</a>
+            ) : (
+              '-'
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>{he.passengerNameLabel}</dt>
+          <dd>{item.passenger_name || '-'}</dd>
+        </div>
+        <div>
+          <dt>{he.passengerPhoneLabel}</dt>
+          <dd>
+            {item.passenger_phone ? (
+              <a href={`tel:${item.passenger_phone}`}>{item.passenger_phone}</a>
+            ) : (
+              '-'
+            )}
+          </dd>
+        </div>
+        {item.confirmed_at ? (
+          <div>
+            <dt>{he.travelConfirmedAt}</dt>
+            <dd>{formatMeetingTime(item.confirmed_at)}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </div>
+  )
+}
+
+function MatchDetails({ item, showPassengerPhone = false }) {
+  return (
+    <>
+      {(item.origin && item.destination) ? (
+        <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
+      ) : null}
+      {item.departure_time ? (
+        <div className="meta">{he.meetingTimeLabel}: {formatMeetingTime(item.departure_time)}</div>
+      ) : null}
+      <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
+      <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+      {showPassengerPhone && item.passenger_phone ? (
+        <div className="meta">{he.passengerPhoneLabel}: <a href={`tel:${item.passenger_phone}`}>{item.passenger_phone}</a></div>
+      ) : null}
+    </>
+  )
 }
 
 function Icon({ name }) {
@@ -651,8 +734,11 @@ function App() {
   async function confirmMatch(matchId) {
     await withLoading(async () => {
       try {
-        await callApi('/matches/accept', 'POST', { match_id: matchId }, true)
-        setMessage(he.matchAccepted(matchId))
+        const confirmation = await callApi('/matches/accept', 'POST', { match_id: matchId }, true)
+        const detail = confirmation?.departure_time
+          ? `${he.meetingTimeLabel}: ${formatMeetingTime(confirmation.departure_time)}`
+          : ''
+        setMessage(`${he.matchAccepted(matchId)}${detail ? ` · ${detail}` : ''}`)
         pushNotification(he.matchAccepted(matchId))
         await loadDriverPending()
         await loadDriverActive({ quiet: true })
@@ -856,6 +942,7 @@ function App() {
                 <div className="rideBlock">
                   <strong>#{item.id}</strong>
                   <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                  <div className="meta">{he.meetingTimeLabel}: {formatMeetingTime(item.departure_time)}</div>
                   <div className="meta">{he.seatsAvail}: {item.seats_available} · {he.driver} מס׳ {item.driver_id}</div>
                 </div>
                 <div className="actionCol">
@@ -876,6 +963,7 @@ function App() {
                     <div className="rideBlock">
                       <strong>#{item.id}</strong>
                       <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                      <div className="meta">{he.meetingTimeLabel}: {formatMeetingTime(item.departure_time)}</div>
                       <div className="meta">{he.seatsRatio}: {item.seats_available} / {item.seats_total}</div>
                     </div>
                   </li>
@@ -894,6 +982,7 @@ function App() {
             <form onSubmit={publishRide}>
               <input ref={rideOriginRef} placeholder={mapsLoaded ? he.originPubPh : he.originPubShort} value={ride.origin} onChange={(e) => { setRide({ ...ride, origin: e.target.value }); setRideCoords((prev) => ({ ...prev, origin: null })) }} required />
               <input ref={rideDestinationRef} placeholder={mapsLoaded ? he.destPubPh : he.destPubShort} value={ride.destination} onChange={(e) => { setRide({ ...ride, destination: e.target.value }); setRideCoords((prev) => ({ ...prev, destination: null })) }} required />
+              <label className="fieldLabel">{he.publishMeetingTimeLabel}</label>
               <input type="datetime-local" value={ride.departure_time} onChange={(e) => setRide({ ...ride, departure_time: e.target.value })} required />
               <input type="number" min="1" max="8" value={ride.seats_total} onChange={(e) => setRide({ ...ride, seats_total: e.target.value })} required />
               <button type="submit" disabled={!token || loading}>{he.publishBtn}</button>
@@ -913,6 +1002,7 @@ function App() {
                   <div className="rideBlock">
                     <strong>#{item.id}</strong>
                     <div className="routeRow"><span className="routeChip">{item.origin}</span><span className="routeArrow">{he.routeSep}</span><span className="routeChip">{item.destination}</span></div>
+                    <div className="meta">{he.meetingTimeLabel}: {formatMeetingTime(item.departure_time)}</div>
                     <div className="meta">{he.seatsRatio}: {item.seats_available} / {item.seats_total}</div>
                   </div>
                   <div className="actionCol">
@@ -937,11 +1027,8 @@ function App() {
                   <div>
                     <strong>{he.matchLine(item.match_id, item.ride_id)}</strong>
                     <div className="meta">{he.status}: {matchStatusHe(item.status)}</div>
-                    {(item.origin && item.destination) ? (
-                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
-                    ) : null}
-                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
-                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                    <MatchDetails item={item} />
+                    <TravelConfirmation item={item} />
                   </div>
                   {(item.status === 'PENDING' || item.status === 'ACCEPTED') ? (
                     <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>{he.cancelBtn}</button>
@@ -959,11 +1046,7 @@ function App() {
                 <li key={`incoming-${item.match_id}`}>
                   <div>
                     <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
-                    {(item.origin && item.destination) ? (
-                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
-                    ) : null}
-                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
-                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                    <MatchDetails item={item} showPassengerPhone />
                   </div>
                   <div className="actionCol">
                     <button type="button" onClick={() => confirmMatch(item.match_id)} disabled={loading}>{he.acceptBtn}</button>
@@ -982,11 +1065,8 @@ function App() {
                 <li key={`active-${item.match_id}`}>
                   <div>
                     <strong>{he.matchLineDriver(item.match_id, item.ride_id, item.passenger_id)}</strong>
-                    {(item.origin && item.destination) ? (
-                      <div className="meta">{he.routeLabel}: {item.origin} {he.routeSep} {item.destination}</div>
-                    ) : null}
-                    <div className="meta">{he.driverNameLabel}: {item.driver_name || item.driver_id || '-'}</div>
-                    <div className="meta">{he.passengerNameLabel}: {item.passenger_name || item.passenger_id || '-'}</div>
+                    <MatchDetails item={item} showPassengerPhone />
+                    <TravelConfirmation item={item} />
                   </div>
                   <div className="actionCol">
                     <button type="button" onClick={() => completeRide(item.match_id)} disabled={loading}>{he.completeRideBtn}</button>
