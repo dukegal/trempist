@@ -10,11 +10,15 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
    pip install -r requirements.txt
    ```
 
-2. Start API server:
+2. Start API server (from repo root `d:\2.Shani\Project`, not `frontend/`):
 
    ```bash
-   uvicorn app.main:app --reload
+   py -m pip install -r requirements.txt
+   py -m uvicorn app.main:app --reload
    ```
+
+   On Windows use **`py`**, not `python` — the `python` command often opens the Microsoft Store stub.
+   On macOS/Linux use `python3` instead of `py`.
 
 3. Open docs:
    - http://127.0.0.1:8000/docs
@@ -42,7 +46,7 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 ## Implemented MVP endpoints
 
 - **User registration / login:** raw TCP auth server only (`AuthServer` on port 9000, AES-GCM).
-  - Direct TCP client: `python -m app.auth_socket_client register|login`
+  - Direct TCP client (from repo root): `py -m app.auth_socket_client register|login` (Windows) or `python3 -m ...` (Linux/macOS)
   - Browser cannot use raw TCP — paste the JWT from the CLI into the web UI.
   - `POST /auth/register` and `POST /auth/login` return **410 Gone**.
 - `GET /users/me` (JWT from TCP auth)

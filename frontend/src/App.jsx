@@ -9,6 +9,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
+/** Windows: use `py` launcher — `python` often opens Microsoft Store stub */
+function authCliCmd(action) {
+  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
+  const base = isWindows ? 'py -m app.auth_socket_client' : 'python3 -m app.auth_socket_client'
+  return `${base} ${action}`
+}
+
 // ---------------------------------------------------------------
 // אובייקט עברית — כל מחרוזות הממשק במקום אחד
 // הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
@@ -19,9 +26,7 @@ const he = {
   welcome: 'ברוכים הבאים',
   authSubtitle: 'הרשמה והתחברות מתבצעות בקליינט TCP — לאחר מכן הדביקו את ה-JWT כאן.',
   authTcpTitle: 'שרת אימות TCP (פורט 9000)',
-  authTcpExplain: 'הדפדפן לא יכול להתחבר ישירות ל-TCP. הריצו בטרמינל (מחובר לשרת האימות):',
-  authRegisterCmd: 'python -m app.auth_socket_client register',
-  authLoginCmd: 'python -m app.auth_socket_client login',
+  authTcpExplain: 'הדפדפן לא יכול להתחבר ישירות ל-TCP. הריצו בטרמינל מתיקיית הפרויקט (Windows: py, לא python):',
   authTokenLabel: 'JWT מהקליינט',
   authTokenPh: 'הדביקו את ה-token מה-JSON שהתקבל',
   authTokenBtn: 'כניסה עם טוקן',
@@ -953,7 +958,7 @@ function App() {
                 <div className="authForm authCliBox">
                   <h3 className="authCliTitle">{he.authTcpTitle}</h3>
                   <p className="authCliText">{he.authTcpExplain}</p>
-                  <pre className="authCliCmd"><code>{authMode === 'signup' ? he.authRegisterCmd : he.authLoginCmd}</code></pre>
+                  <pre className="authCliCmd"><code>{authCliCmd(authMode === 'signup' ? 'register' : 'login')}</code></pre>
                 </div>
                 <form className="authForm" onSubmit={tokenSubmit}>
                   <label className="authField">
