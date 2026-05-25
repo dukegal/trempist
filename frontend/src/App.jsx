@@ -9,12 +9,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
-function socketUrl(path) {
-  const url = new URL(path, API_BASE_URL)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
-}
-
 // ---------------------------------------------------------------
 // אובייקט עברית — כל מחרוזות הממשק במקום אחד
 // הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
@@ -23,7 +17,15 @@ const he = {
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
   welcome: 'ברוכים הבאים',
-  authSubtitle: 'התחברו או הירשמו — ותתחילו לשתף טרמפים תוך שניות.',
+  authSubtitle: 'הרשמה והתחברות מתבצעות בקליינט TCP — לאחר מכן הדביקו את ה-JWT כאן.',
+  authTcpTitle: 'שרת אימות TCP (פורט 9000)',
+  authTcpExplain: 'הדפדפן לא יכול להתחבר ישירות ל-TCP. הריצו בטרמינל (מחובר לשרת האימות):',
+  authRegisterCmd: 'python -m app.auth_socket_client register',
+  authLoginCmd: 'python -m app.auth_socket_client login',
+  authTokenLabel: 'JWT מהקליינט',
+  authTokenPh: 'הדביקו את ה-token מה-JSON שהתקבל',
+  authTokenBtn: 'כניסה עם טוקן',
+  authTokenInvalid: 'הטוקן לא תקין או פג תוקף',
   authBullet1: 'חיפוש נסיעות לפי מוצא ויעד על המפה',
   authBullet2: 'פרסום מקום פנוי ברכב בקלות',
   authBullet3: 'התאמה מהירה בין נוסעים לנהגים',
@@ -31,8 +33,6 @@ const he = {
   loginLead: 'כניסה לחשבון קיים',
   loginTab: 'התחברות',
   signupTab: 'הרשמה',
-  loginBtn: 'התחבר',
-  createAccount: 'יצירת חשבון',
   tagline: 'שיתוף טרמפים, ללא תשלום.',
   apiLabel: 'שרת',
   themeDark: 'מצב כהה',
@@ -367,8 +367,7 @@ function App() {
   const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [auth, setAuth] = useState({ name: '', phone: '', email: '', password: '' })
-  const [login, setLogin] = useState({ email: '', password: '' })
+  const [pasteToken, setPasteToken] = useState('')
   const [ride, setRide] = useState({ origin: '', destination: '', departure_time: '', seats_total: 1 })
   const [search, setSearch] = useState({
     origin: '',
@@ -474,43 +473,6 @@ function App() {
     return data
   }
 
-  async function registerViaSocket(payload) {
-    return new Promise((resolve, reject) => {
-      const socket = new WebSocket(socketUrl('/ws/auth/register'))
-      let settled = false
-      const timeoutId = window.setTimeout(() => finish(null, new Error(he.requestFailed)), 10000)
-
-      function finish(data, error = null) {
-        if (settled) return
-        settled = true
-        window.clearTimeout(timeoutId)
-        socket.close()
-        if (error) {
-          reject(error)
-        } else {
-          resolve(data)
-        }
-      }
-
-      socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ cmd: 'REGISTER', data: payload }))
-      })
-
-      socket.addEventListener('message', (event) => {
-        try {
-          const response = JSON.parse(event.data)
-          if (!response.ok) throw new Error(response.error || he.requestFailed)
-          finish({ token: response.token, user_id: response.user_id })
-        } catch (error) {
-          finish(null, error)
-        }
-      })
-
-      socket.addEventListener('error', () => finish(null, new Error(he.requestFailed)))
-      socket.addEventListener('close', () => finish(null, new Error(he.requestFailed)))
-    })
-  }
-
   function bindAutocomplete(inputEl, onSelect, extraOptions = null) {
     if (!mapsLoaded || !inputEl || inputEl.dataset.autocompleteBound === '1') return
     const base = { fields: ['formatted_address', 'geometry'] }
@@ -576,9 +538,20 @@ function App() {
   }
 
   useEffect(() => {
-    if (!token || me) return
-    loadProfile({ quiet: true }).catch(() => {})
-  }, [token, me])
+    if (!token) {
+      setMe(null)
+      return
+    }
+    loadProfile({ quiet: true })
+      .then((profile) => {
+        if (!profile) {
+          localStorage.removeItem('token')
+          setToken('')
+          setMe(null)
+        }
+      })
+      .catch(() => {})
+  }, [token])
 
   useEffect(() => {
     if (!token) return
@@ -649,37 +622,32 @@ function App() {
     drawRoute(rideMapInstance.current, rideDirectionsService, rideDirectionsRenderer, rideCoords)
   }, [mapsLoaded, activeTab, rideCoords])
 
-  async function registerSubmit(event) {
+  async function tokenSubmit(event) {
     event.preventDefault()
-    const displayName = auth.name.trim()
-    await withLoading(async () => {
+    let jwt = pasteToken.trim()
+    if (!jwt) return
+    if (jwt.startsWith('{')) {
       try {
-        const data = await registerViaSocket(auth)
-        localStorage.setItem('token', data.token)
-        setAuth({ name: '', phone: '', email: '', password: '' })
-        setMe(null)
-        setToken(data.token)
-        setMessage(he.welcomeAfterRegister(displayName))
-        await loadMyPublishedRides()
-      } catch (error) {
-        setMessage(error.message)
+        const parsed = JSON.parse(jwt)
+        jwt = parsed.token || parsed.access_token || jwt
+      } catch {
+        // use raw string
       }
-    })
-  }
-
-  async function loginSubmit(event) {
-    event.preventDefault()
+    }
     await withLoading(async () => {
-      try {
-        const data = await callApi('/auth/login', 'POST', login)
-        localStorage.setItem('token', data.token)
-        setToken(data.token)
-        setMe(null)
-        setMessage(he.loggedIn)
-        await loadMyPublishedRides()
-      } catch (error) {
-        setMessage(error.message)
+      localStorage.setItem('token', jwt)
+      setToken(jwt)
+      setMe(null)
+      const profile = await loadProfile({ quiet: true })
+      if (!profile) {
+        localStorage.removeItem('token')
+        setToken('')
+        setMessage(he.authTokenInvalid)
+        return
       }
+      setPasteToken('')
+      setMessage(he.loggedIn)
+      await loadMyPublishedRides()
     })
   }
 
@@ -982,39 +950,25 @@ function App() {
                   <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
                   <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>{he.signupTab}</button>
                 </div>
-                {authMode === 'login' ? (
-                  <form className="authForm" onSubmit={loginSubmit}>
-                    <label className="authField">
-                      <span className="authLabel">{he.labelEmail}</span>
-                      <input type="email" autoComplete="email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
-                    </label>
-                    <label className="authField">
-                      <span className="authLabel">{he.password}</span>
-                      <input type="password" autoComplete="current-password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
-                    </label>
-                    <button type="submit" className="authSubmit" disabled={loading}>{he.loginBtn}</button>
-                  </form>
-                ) : (
-                  <form className="authForm" onSubmit={registerSubmit}>
-                    <label className="authField">
-                      <span className="authLabel">{he.labelName}</span>
-                      <input autoComplete="name" value={auth.name} onChange={(e) => setAuth({ ...auth, name: e.target.value })} required minLength={2} />
-                    </label>
-                    <label className="authField">
-                      <span className="authLabel">{he.phone}</span>
-                      <input type="tel" autoComplete="tel" value={auth.phone} onChange={(e) => setAuth({ ...auth, phone: e.target.value })} required />
-                    </label>
-                    <label className="authField">
-                      <span className="authLabel">{he.labelEmail}</span>
-                      <input type="email" autoComplete="email" value={auth.email} onChange={(e) => setAuth({ ...auth, email: e.target.value })} required />
-                    </label>
-                    <label className="authField">
-                      <span className="authLabel">{he.password}</span>
-                      <input type="password" autoComplete="new-password" value={auth.password} onChange={(e) => setAuth({ ...auth, password: e.target.value })} required minLength={6} />
-                    </label>
-                    <button type="submit" className="authSubmit" disabled={loading}>{he.createAccount}</button>
-                  </form>
-                )}
+                <div className="authForm authCliBox">
+                  <h3 className="authCliTitle">{he.authTcpTitle}</h3>
+                  <p className="authCliText">{he.authTcpExplain}</p>
+                  <pre className="authCliCmd"><code>{authMode === 'signup' ? he.authRegisterCmd : he.authLoginCmd}</code></pre>
+                </div>
+                <form className="authForm" onSubmit={tokenSubmit}>
+                  <label className="authField">
+                    <span className="authLabel">{he.authTokenLabel}</span>
+                    <textarea
+                      className="authTokenInput"
+                      rows={3}
+                      value={pasteToken}
+                      onChange={(e) => setPasteToken(e.target.value)}
+                      placeholder={he.authTokenPh}
+                      required
+                    />
+                  </label>
+                  <button type="submit" className="authSubmit" disabled={loading}>{he.authTokenBtn}</button>
+                </form>
               </div>
             </div>
           </div>

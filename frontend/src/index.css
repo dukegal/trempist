@@ -422,6 +422,60 @@ body {
   box-shadow: 0 10px 32px rgba(0, 163, 217, 0.4) !important;
 }
 
+.authCliBox {
+  display: grid;
+  gap: 12px;
+  text-align: right;
+}
+
+.authCliTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--wz-slate);
+}
+
+.authCliText {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--wz-slate);
+}
+
+.authCliCmd {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 35, 55, 0.92);
+  color: #d6f5ff;
+  direction: ltr;
+  text-align: left;
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  overflow-x: auto;
+  user-select: all;
+}
+
+.authTokenInput {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  padding: 10px 12px;
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  background: var(--card);
+  color: var(--text);
+  direction: ltr;
+  text-align: left;
+}
+
+.theme-dark .authCliTitle,
+.theme-dark .authCliText {
+  color: #d6e9f5;
+}
+
 .authPanelCard .authSwitch {
   margin: 4px 0 16px;
 }

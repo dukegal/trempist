@@ -41,9 +41,11 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 
 ## Implemented MVP endpoints
 
-- `WS /ws/auth/register` (registration only; `POST /auth/register` is disabled)
-- `POST /auth/login`
-- `GET /users/me`
+- **User registration / login:** raw TCP auth server only (`AuthServer` on port 9000, AES-GCM).
+  - Direct TCP client: `python -m app.auth_socket_client register|login`
+  - Browser cannot use raw TCP — paste the JWT from the CLI into the web UI.
+  - `POST /auth/register` and `POST /auth/login` return **410 Gone**.
+- `GET /users/me` (JWT from TCP auth)
 - `POST /rides`
 - `POST /rides/search`
 - `GET /rides/mine`

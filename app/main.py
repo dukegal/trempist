@@ -8,31 +8,27 @@ from datetime import datetime, timedelta, timezone
 import os
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 from sqlalchemy import and_, delete, func, inspect, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import decode_token
-from app.database import Base, SessionLocal, engine, get_db
+from app.auth_socket_server import AuthServer
+from app.database import Base, engine, get_db
 from app.models import CreditsLog, Match, MatchStatus, Rating, Ride, RideStatus, User
 from app.schemas import (
-    LoginIn,
     MatchConfirmIn,
     MatchRequestIn,
     RatingIn,
-    RegisterIn,
     RideCreateIn,
     RideOut,
     RideSearchIn,
-    TokenOut,
     UserOut,
 )
-from app.user_manager import LoginError, RegistrationError, UserManager
 
 # יצירת כל הטבלאות אם לא קיימות — SQLAlchemy עושה זאת אוטומטית
 try:
@@ -75,6 +71,26 @@ app = FastAPI(title="טרמפיסט — API")
 
 # TTL לבקשות ממתינות — ניתן לשינוי דרך משתני סביבה
 MATCH_REQUEST_TTL_HOURS = int(os.getenv("MATCH_REQUEST_TTL_HOURS", "24"))
+
+# שרת TCP גולמי להרשמה — מופעל יחד עם FastAPI כך שהקליינט
+# (app/auth_socket_client.py) יכול להתחבר ל-127.0.0.1:9000.
+_auth_server: AuthServer | None = None
+
+
+@app.on_event("startup")
+def _start_auth_socket_server() -> None:
+    global _auth_server
+    if _auth_server is None:
+        _auth_server = AuthServer()
+        _auth_server.start()
+
+
+@app.on_event("shutdown")
+def _stop_auth_socket_server() -> None:
+    global _auth_server
+    if _auth_server is not None:
+        _auth_server.stop()
+        _auth_server = None
 
 
 @app.exception_handler(RequestValidationError)
@@ -199,73 +215,30 @@ def health():
 # ---------------------------------------------------------------
 # אימות — הרשמה וכניסה
 #
-# הרשמה מתבצעת רק דרך Socket over TCP, לא דרך REST.
-# לוגיקת האימות: UserManager — PBKDF2 עם salt לכל משתמש + pepper בשרת.
+# הרשמה/כניסה מתבצעות אך ורק דרך שרת TCP גולמי (AuthServer, פורט 9000):
+#   python -m app.auth_socket_client register|login
 #
-# שרת TCP גולמי נפרד ללקוחות שאינם דפדפן (אופציונלי): הרץ
-#   python -m app.auth_socket_server
+# דפדפן אינו יכול לפתוח TCP גולמי — לאחר CLI מדביקים JWT בממשק.
+# FastAPI מאמת JWT בלבד (decode_token) ל-endpoints של נסיעות/התאמות.
 # ---------------------------------------------------------------
+
 
 @app.post("/auth/register")
 def register_disabled():
-    """הרשמה ב-REST מושבתת; יש להשתמש ב-Socket בלבד."""
-    api_error(status.HTTP_410_GONE, "E410", "הרשמה זמינה רק דרך חיבור Socket")
+    api_error(
+        status.HTTP_410_GONE,
+        "E410",
+        "הרשמה זמינה רק דרך שרת TCP: python -m app.auth_socket_client register",
+    )
 
 
-@app.websocket("/ws/auth/register")
-async def register_socket(websocket: WebSocket):
-    """
-    Socket-only registration endpoint for browser clients.
-    Client sends: {"cmd": "REGISTER", "data": {name, email, phone, password}}
-    Server replies: {"cmd": "RESPONSE", "ok": true, "token": "...", "user_id": 1}
-    """
-    await websocket.accept()
-    db = SessionLocal()
-    try:
-        msg = await websocket.receive_json()
-        if msg.get("cmd") != "REGISTER":
-            await websocket.send_json({"cmd": "RESPONSE", "ok": False, "error": "פקודה לא מוכרת"})
-            return
-
-        payload = RegisterIn(**msg.get("data", {}))
-        result = UserManager(db).register(
-            name=payload.name,
-            email=payload.email,
-            phone=payload.phone,
-            password=payload.password,
-        )
-        await websocket.send_json({
-            "cmd": "RESPONSE",
-            "ok": True,
-            "token": result["token"],
-            "user_id": result["user_id"],
-        })
-    except WebSocketDisconnect:
-        pass
-    except ValidationError:
-        await websocket.send_json({
-            "cmd": "RESPONSE",
-            "ok": False,
-            "error": "הנתונים שנשלחו אינם תקינים (אורך, פורמט או ערכים חסרים).",
-        })
-    except RegistrationError as e:
-        await websocket.send_json({"cmd": "RESPONSE", "ok": False, "error": str(e)})
-    finally:
-        db.close()
-        try:
-            await websocket.close()
-        except RuntimeError:
-            pass
-
-
-@app.post("/auth/login", response_model=TokenOut)
-def login(payload: LoginIn, db: Session = Depends(get_db)):
-    """כניסת משתמש קיים."""
-    try:
-        result = UserManager(db).login(email=payload.email, password=payload.password)
-        return {"token": result["token"], "user_id": result["user_id"]}
-    except LoginError as e:
-        api_error(status.HTTP_401_UNAUTHORIZED, "E001", str(e))
+@app.post("/auth/login")
+def login_disabled():
+    api_error(
+        status.HTTP_410_GONE,
+        "E410",
+        "כניסה זמינה רק דרך שרת TCP: python -m app.auth_socket_client login",
+    )
 
 
 @app.get("/users/me", response_model=UserOut)
