@@ -41,7 +41,7 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 
 ## Implemented MVP endpoints
 
-- `POST /auth/register`
+- `WS /ws/auth/register` (registration only; `POST /auth/register` is disabled)
 - `POST /auth/login`
 - `GET /users/me`
 - `POST /rides`

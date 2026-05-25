@@ -9,6 +9,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
+function socketUrl(path) {
+  const url = new URL(path, API_BASE_URL)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.toString()
+}
+
 // ---------------------------------------------------------------
 // אובייקט עברית — כל מחרוזות הממשק במקום אחד
 // הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
@@ -327,8 +333,8 @@ function useGoogleMaps(apiKey) {
   useEffect(() => {
     if (!apiKey) return  // אם אין מפתח — לא טוענים
     if (window.google?.maps?.places) {
-      setLoaded(true)
-      return  // כבר נטען בעבר
+      const timer = window.setTimeout(() => setLoaded(true), 0)
+      return () => window.clearTimeout(timer)
     }
     const scriptId = 'google-maps-script'
     const existing = document.getElementById(scriptId)
@@ -404,13 +410,6 @@ function App() {
   const searchDirectionsService = useRef(null)
   const rideDirectionsService = useRef(null)
 
-  // headers מחושבים מהטוקן — מתעדכנים רק כשהטוקן משתנה
-  const headers = useMemo(() => {
-    const t = token || localStorage.getItem('token')
-    if (!t) return { 'Content-Type': 'application/json' }
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }
-  }, [token])
-
   const rootClassName = `container theme-${theme} rtl`
   const stats = useMemo(
     () => ({
@@ -473,6 +472,43 @@ function App() {
       throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
     }
     return data
+  }
+
+  async function registerViaSocket(payload) {
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(socketUrl('/ws/auth/register'))
+      let settled = false
+      const timeoutId = window.setTimeout(() => finish(null, new Error(he.requestFailed)), 10000)
+
+      function finish(data, error = null) {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeoutId)
+        socket.close()
+        if (error) {
+          reject(error)
+        } else {
+          resolve(data)
+        }
+      }
+
+      socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ cmd: 'REGISTER', data: payload }))
+      })
+
+      socket.addEventListener('message', (event) => {
+        try {
+          const response = JSON.parse(event.data)
+          if (!response.ok) throw new Error(response.error || he.requestFailed)
+          finish({ token: response.token, user_id: response.user_id })
+        } catch (error) {
+          finish(null, error)
+        }
+      })
+
+      socket.addEventListener('error', () => finish(null, new Error(he.requestFailed)))
+      socket.addEventListener('close', () => finish(null, new Error(he.requestFailed)))
+    })
   }
 
   function bindAutocomplete(inputEl, onSelect, extraOptions = null) {
@@ -618,7 +654,7 @@ function App() {
     const displayName = auth.name.trim()
     await withLoading(async () => {
       try {
-        const data = await callApi('/auth/register', 'POST', auth)
+        const data = await registerViaSocket(auth)
         localStorage.setItem('token', data.token)
         setAuth({ name: '', phone: '', email: '', password: '' })
         setMe(null)
