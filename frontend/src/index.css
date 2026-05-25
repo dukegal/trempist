@@ -928,6 +928,94 @@ button:disabled {
   text-underline-offset: 2px;
 }
 
+.ratingCard {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(255, 224, 102, 0.14) 0%, rgba(30, 200, 255, 0.08) 100%);
+  border: 2px solid rgba(255, 193, 7, 0.35);
+}
+
+.theme-dark .ratingCard {
+  background: rgba(255, 193, 7, 0.08);
+  border-color: rgba(255, 193, 7, 0.25);
+}
+
+.ratingForm {
+  display: grid;
+  gap: 10px;
+}
+
+.ratingPrompt {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.starPicker {
+  display: flex;
+  gap: 6px;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+.star {
+  border: none;
+  background: transparent;
+  font-size: 1.65rem;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.starOn {
+  color: #f5b301;
+  opacity: 1;
+}
+
+.star:disabled {
+  cursor: not-allowed;
+}
+
+.ratingComment {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  padding: 10px 12px;
+  font: inherit;
+  background: var(--card);
+  color: var(--text);
+}
+
+.ratingActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ratingModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(8, 20, 32, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.ratingModal {
+  width: min(100%, 420px);
+  background: var(--card);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
 .subCard {
   margin-top: 16px;
   background: linear-gradient(135deg, rgba(30, 200, 255, 0.08) 0%, rgba(255, 224, 102, 0.12) 100%);

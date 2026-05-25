@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, delete, func, inspect, or_, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import decode_token
@@ -680,6 +681,13 @@ def confirm_match(
     return accept_match(payload, db, current_user)
 
 
+@app.get("/ratings/my-given")
+def my_given_ratings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """רשימת משתמשים שכבר דירגתי — לתצוגה ב-Frontend"""
+    rows = db.scalars(select(Rating.rated_user_id).where(Rating.rater_id == current_user.id)).all()
+    return [{"rated_user_id": uid} for uid in rows]
+
+
 @app.post("/ratings")
 def add_rating(
     payload: RatingIn,
@@ -718,14 +726,18 @@ def add_rating(
         comment=payload.comment,
     )
     db.add(rating)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", "כבר דירגת משתמש זה")
 
     # חישוב ממוצע מעודכן
     avg = db.scalar(select(func.avg(Rating.stars)).where(Rating.rated_user_id == payload.rated_user_id)) or 0.0
     rated_user = db.get(User, payload.rated_user_id)
     rated_user.rating_avg = round(float(avg), 2)
     db.commit()
-    return {"status": "OK"}
+    return {"status": "OK", "rating_avg": rated_user.rating_avg}
 
 
 @app.post("/admin/block/{user_id}")

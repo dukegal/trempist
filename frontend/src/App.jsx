@@ -133,6 +133,17 @@ const he = {
   publishMeetingTimeLabel: 'תאריך ושעת המפגש',
   travelConfirmationTitle: 'אישור נסיעה',
   travelConfirmedAt: 'אושר ב',
+  ratingLabel: 'דירוג',
+  ratingShort: 'דירוג',
+  ratingStars: 'כוכבים',
+  ratingCommentPh: 'תגובה (אופציונלי)',
+  rateSubmitBtn: 'שליחת דירוג',
+  rateSkip: 'דילוג',
+  rateUserTitle: (name) => `דרגו את ${name}`,
+  rateDriverPrompt: 'דרגו את הנהג לאחר הנסיעה',
+  ratePassengerPrompt: 'דרגו את הנוסע לאחר הנסיעה',
+  ratingSubmitted: 'הדירוג נשלח — תודה!',
+  ratingAlready: 'כבר דירגת משתמש זה',
   creditIn: 'זיכוי',
   creditOut: 'חיוב',
   atTime: (iso) => `בתאריך ${new Date(iso).toLocaleString('he-IL')}`,
@@ -153,6 +164,69 @@ function matchStatusHe(s) {
 function formatMeetingTime(iso) {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('he-IL', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatRatingAvg(avg) {
+  if (avg == null || avg <= 0) return '—'
+  return `${Number(avg).toFixed(1)} ★`
+}
+
+function StarPicker({ value, onChange, disabled }) {
+  return (
+    <div className="starPicker" role="group" aria-label={he.ratingStars}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          className={n <= value ? 'star starOn' : 'star'}
+          onClick={() => onChange(n)}
+          disabled={disabled}
+          aria-label={`${n} ${he.ratingStars}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function RatingForm({ ratedUserId, ratedUserName, prompt, onSubmit, onSkip, disabled }) {
+  const [stars, setStars] = useState(5)
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (!ratedUserId || busy || disabled) return
+    setBusy(true)
+    try {
+      await onSubmit({ rated_user_id: ratedUserId, stars, comment: comment.trim() })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="ratingForm" onSubmit={handleSubmit}>
+      <p className="ratingPrompt">{prompt || he.rateUserTitle(ratedUserName || `#${ratedUserId}`)}</p>
+      <StarPicker value={stars} onChange={setStars} disabled={disabled || busy} />
+      <textarea
+        className="ratingComment"
+        rows={2}
+        maxLength={1000}
+        placeholder={he.ratingCommentPh}
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        disabled={disabled || busy}
+      />
+      <div className="ratingActions">
+        <button type="submit" disabled={disabled || busy}>{he.rateSubmitBtn}</button>
+        {onSkip ? (
+          <button type="button" className="ghost" onClick={onSkip} disabled={busy}>{he.rateSkip}</button>
+        ) : null}
+      </div>
+    </form>
+  )
 }
 
 function TravelConfirmation({ item }) {
@@ -310,6 +384,8 @@ function App() {
   const [driverActive, setDriverActive] = useState([])    // נסיעות פעילות כנהג
   const [creditsLog, setCreditsLog] = useState([])        // היסטוריית קרדיטים
   const [notifications, setNotifications] = useState([])
+  const [ratedUserIds, setRatedUserIds] = useState(() => new Set())
+  const [ratingPrompt, setRatingPrompt] = useState(null)  // { ratedUserId, ratedUserName, prompt }
 
   const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   const { loaded: mapsLoaded, error: mapsError } = useGoogleMaps(mapsApiKey)
@@ -342,9 +418,18 @@ function App() {
       myRequests: myRequests.length,
       pendingApprovals: driverPending.length,
       credits: me?.credits ?? null,
+      rating: me?.rating_avg ?? null,
     }),
-    [rides.length, myRequests.length, driverPending.length, me?.credits],
+    [rides.length, myRequests.length, driverPending.length, me?.credits, me?.rating_avg],
   )
+
+  function hasRated(userId) {
+    return ratedUserIds.has(userId)
+  }
+
+  function markRated(userId) {
+    setRatedUserIds((prev) => new Set(prev).add(userId))
+  }
 
   function mapDefaults() {
     return { center: { lat: 32.0853, lng: 34.7818 }, zoom: 9, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }
@@ -465,6 +550,7 @@ function App() {
     loadDriverPending({ quiet: true }).catch(() => {})
     loadDriverActive({ quiet: true }).catch(() => {})
     loadCreditsLog({ quiet: true }).catch(() => {})
+    loadMyRatingsGiven({ quiet: true }).catch(() => {})
   }, [token])
 
   useEffect(() => {
@@ -703,6 +789,33 @@ function App() {
     })
   }
 
+  async function loadMyRatingsGiven(options = {}) {
+    const { quiet = false } = options
+    try {
+      const data = await callApi('/ratings/my-given', 'GET', null, true)
+      setRatedUserIds(new Set(data.map((item) => item.rated_user_id)))
+    } catch (error) {
+      if (!quiet) setMessage(error.message)
+    }
+  }
+
+  async function submitRating(payload, options = {}) {
+    const { quiet = false } = options
+    try {
+      await callApi('/ratings', 'POST', payload, true)
+      markRated(payload.rated_user_id)
+      if (!quiet) {
+        setMessage(he.ratingSubmitted)
+        pushNotification(he.ratingSubmitted)
+      }
+      await loadProfile({ quiet: true })
+      return true
+    } catch (error) {
+      if (!quiet) setMessage(error.message)
+      return false
+    }
+  }
+
   async function loadCreditsLog(options = {}) {
     const { quiet = false } = options
     const runner = quiet ? async (action) => action() : withLoading
@@ -717,12 +830,21 @@ function App() {
   }
 
   async function completeRide(matchId) {
+    const match = driverActive.find((item) => item.match_id === matchId)
     await withLoading(async () => {
       try {
         await callApi('/matches/complete', 'POST', { match_id: matchId }, true)
         pushNotification(`ההתאמה ${matchId} הושלמה`)
+        if (match?.passenger_id && !hasRated(match.passenger_id)) {
+          setRatingPrompt({
+            ratedUserId: match.passenger_id,
+            ratedUserName: match.passenger_name || `#${match.passenger_id}`,
+            prompt: he.ratePassengerPrompt,
+          })
+        }
         await loadDriverActive({ quiet: true })
         await loadDriverPending({ quiet: true })
+        await loadMyRequests({ quiet: true })
         await loadCreditsLog({ quiet: true })
         await loadProfile({ quiet: true })
       } catch (error) {
@@ -785,6 +907,8 @@ function App() {
     setDriverActive([])
     setCreditsLog([])
     setNotifications([])
+    setRatedUserIds(new Set())
+    setRatingPrompt(null)
     setDriverRides([])
     setSelectedDriverId(null)
     setMessage(he.loggedOut)
@@ -883,7 +1007,12 @@ function App() {
               {menuOpen ? (
                 <div className="profileMenu">
                   <button type="button" className="menuItem" onClick={() => withLoading(loadProfile)}>{he.profileMenu}</button>
-                  {me ? <div className="menuMeta">{he.creditsShort}: <strong>{me.credits}</strong></div> : null}
+                  {me ? (
+                    <>
+                      <div className="menuMeta">{he.creditsShort}: <strong>{me.credits}</strong></div>
+                      <div className="menuMeta">{he.ratingLabel}: <strong>{formatRatingAvg(me.rating_avg)}</strong></div>
+                    </>
+                  ) : null}
                   <button type="button" className="menuItem danger" onClick={logout}>{he.logout}</button>
                 </div>
               ) : null}
@@ -900,6 +1029,7 @@ function App() {
           <div className="stat"><span>{he.myRequestsStat}</span><strong>{stats.myRequests}</strong></div>
           <div className="stat"><span>{he.pendingApprovals}</span><strong>{stats.pendingApprovals}</strong></div>
           <div className="stat statAccent"><span>{he.creditsShort}</span><strong>{stats.credits !== null ? stats.credits : '—'}</strong></div>
+          <div className="stat"><span>{he.ratingShort}</span><strong>{formatRatingAvg(stats.rating)}</strong></div>
         </div>
 
         <nav className="tabs tabsInSurface" aria-label="ניווט ראשי">
@@ -910,6 +1040,24 @@ function App() {
       </section>
 
       {message ? <p className="message messageBand">{message}</p> : null}
+
+      {ratingPrompt ? (
+        <div className="ratingModalBackdrop" role="presentation" onClick={() => setRatingPrompt(null)}>
+          <div className="ratingModal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <RatingForm
+              ratedUserId={ratingPrompt.ratedUserId}
+              ratedUserName={ratingPrompt.ratedUserName}
+              prompt={ratingPrompt.prompt}
+              onSubmit={async (payload) => {
+                const ok = await submitRating(payload)
+                if (ok) setRatingPrompt(null)
+              }}
+              onSkip={() => setRatingPrompt(null)}
+              disabled={loading}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <p className="pageMeta" title={API_BASE_URL}>{he.apiLabel}: <span className="pageMetaUrl">{API_BASE_URL}</span></p>
 
@@ -1029,6 +1177,20 @@ function App() {
                     <div className="meta">{he.status}: {matchStatusHe(item.status)}</div>
                     <MatchDetails item={item} />
                     <TravelConfirmation item={item} />
+                    {item.status === 'COMPLETED' && item.driver_id && !hasRated(item.driver_id) ? (
+                      <div className="ratingCard">
+                        <RatingForm
+                          ratedUserId={item.driver_id}
+                          ratedUserName={item.driver_name}
+                          prompt={he.rateDriverPrompt}
+                          onSubmit={async (payload) => {
+                            const ok = await submitRating(payload)
+                            if (ok) await loadMyRequests({ quiet: true })
+                          }}
+                          disabled={loading}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                   {(item.status === 'PENDING' || item.status === 'ACCEPTED') ? (
                     <button type="button" className="ghost" onClick={() => cancelMatch(item.match_id)} disabled={loading}>{he.cancelBtn}</button>
