@@ -217,6 +217,11 @@ def main(argv: list[str] | None = None) -> int:
         ensure_ascii=False,
         indent=2,
     ))
+    print(
+        "\nהעתיקו את token לדפדפן (הדבקה במסך הכניסה). "
+        "ודאו ש-.env המקומי משתמש באותם DATABASE_URL ו-SECRET_KEY כמו ב-Render.",
+        file=sys.stderr,
+    )
     return 0
 
 

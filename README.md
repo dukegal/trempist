@@ -23,6 +23,32 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 3. Open docs:
    - http://127.0.0.1:8000/docs
 
+## Local auth (TCP client → server) → paste JWT in browser
+
+Registration and login are **not** in FastAPI. Use the local TCP auth stack:
+
+1. `.env` in repo root with the **same** `DATABASE_URL` and `SECRET_KEY` as Render (Supabase Postgres).
+2. Terminal A — TCP auth server only (not bundled with FastAPI):
+
+   ```powershell
+   .\tools\run_local_auth.ps1
+   ```
+
+   Or: `py -m app.auth_socket_server`
+
+3. Terminal B — register or login:
+
+   ```powershell
+   py -m app.auth_socket_client register
+   py -m app.auth_socket_client login
+   ```
+
+4. Copy `token` from the JSON output → paste in the web login screen.
+
+5. Frontend `.env`: `VITE_API_BASE_URL=https://your-trempist-api.onrender.com`
+
+The auth server stores users in Supabase (via `DATABASE_URL`) using `hash_password` and returns a JWT. Render FastAPI only validates that JWT for rides/matches — no local `uvicorn` required for the app itself.
+
 ## Deploy on Render + Supabase
 
 1. Create a Supabase project and copy the Postgres connection string.
@@ -45,11 +71,11 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 
 ## Implemented MVP endpoints
 
-- **User registration / login:** raw TCP auth server only (`AuthServer` on port 9000, AES-GCM).
-  - Direct TCP client (from repo root): `py -m app.auth_socket_client register|login` (Windows) or `python3 -m ...` (Linux/macOS)
-  - Browser cannot use raw TCP — paste the JWT from the CLI into the web UI.
-  - `POST /auth/register` and `POST /auth/login` return **410 Gone**.
-- `GET /users/me` (JWT from TCP auth)
+- **User registration / login:** local TCP client → TCP auth server (`py -m app.auth_socket_server`, port 9000).
+  - Client: `py -m app.auth_socket_client register|login`
+  - Server writes to Supabase/Postgres (`hash_password` + JWT); paste token in browser
+  - **No** HTTP auth endpoints on FastAPI; auth server is **not** started by FastAPI
+- `GET /users/me` (JWT validation only)
 - `POST /rides`
 - `POST /rides/search`
 - `GET /rides/mine`

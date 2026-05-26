@@ -1,20 +1,9 @@
 # ===============================================================
-# user_manager.py — Secure User Registration & Authentication
+# user_manager.py — User registration & login (TCP auth server only)
 #
-# Security model:
-#   • Passwords hashed with PBKDF2-HMAC-SHA256 (260 000 iterations —
-#     OWASP 2024 recommendation for SHA-256).
-#   • Each password gets a unique random SALT (32 bytes) stored alongside
-#     the hash — defeats Rainbow-Table and batch-cracking attacks.
-#   • A secret server-side PEPPER is mixed in before hashing — even a full
-#     DB dump cannot be cracked without also knowing the pepper.
-#   • Constant-time comparison (hmac.compare_digest) prevents Timing Attacks.
-#   • Per-email threading lock prevents race conditions when the same email
-#     registers or logs in from multiple clients simultaneously.
-#   • All DB queries go through SQLAlchemy ORM (parameterised) — immune to
-#     SQL Injection.
-#   • Error messages never distinguish "email not found" from "wrong password"
-#     (User Enumeration protection).
+# Used exclusively by auth_socket_server.py — not by FastAPI.
+# Writes user details + hash_password() output to Supabase/Postgres (DATABASE_URL).
+# Returns JWT via create_token() for the client to paste into the browser.
 # ===============================================================
 
 import hashlib
@@ -25,7 +14,7 @@ import threading
 
 from sqlalchemy.orm import Session
 
-from app.auth import create_token, verify_password
+from app.auth import create_token, hash_password, verify_password
 from app.models import User
 
 # ── Server-side pepper ────────────────────────────────────────────────────────
@@ -96,14 +85,11 @@ class UserManager:
             if self._db.query(User).filter(User.email == email).first():
                 raise RegistrationError("כתובת האימייל כבר רשומה במערכת")
 
-            salt          = os.urandom(32).hex()      # 256-bit random salt
-            password_hash = self._hash_password(password, salt)
-
             user = User(
                 name=name,
                 email=email,
                 phone=phone,
-                password_hash=f"{salt}${password_hash}",   # stored as "salt$hash"
+                password_hash=hash_password(password),
                 credits=0,
             )
             self._db.add(user)

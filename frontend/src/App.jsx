@@ -9,11 +9,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
-/** Windows: use `py` launcher — `python` often opens Microsoft Store stub */
 function authCliCmd(action) {
   const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
   const base = isWindows ? 'py -m app.auth_socket_client' : 'python3 -m app.auth_socket_client'
   return `${base} ${action}`
+}
+
+function authServerCmd() {
+  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
+  return isWindows ? '.\\tools\\run_local_auth.ps1' : 'py -m app.auth_socket_server'
 }
 
 // ---------------------------------------------------------------
@@ -24,9 +28,11 @@ const he = {
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
   welcome: 'ברוכים הבאים',
-  authSubtitle: 'הרשמה והתחברות מתבצעות בקליינט TCP — לאחר מכן הדביקו את ה-JWT כאן.',
-  authTcpTitle: 'שרת אימות TCP (פורט 9000)',
-  authTcpExplain: 'הדפדפן לא יכול להתחבר ישירות ל-TCP. הריצו בטרמינל מתיקיית הפרויקט (Windows: py, לא python):',
+  authSubtitle: 'הרשמה והתחברות דרך קליינט TCP מקומי. העתיקו את ה-JWT לדפדפן — שאר האפליקציה ב-FastAPI.',
+  authTcpTitle: 'שלב 1 — הפעילו שרת אימות TCP מקומי',
+  authTcpStep2: 'שלב 2 — הריצו בטרמינל (מתיקיית הפרויקט, עם .env — אותם DATABASE_URL ו-SECRET_KEY כמו ב-Render):',
+  authTcpStep3: 'שלב 3 — העתיקו את token מה-JSON והדביקו למטה.',
+  authApiTarget: (url) => `שרת API בדפדפן: ${url}`,
   authTokenLabel: 'JWT מהקליינט',
   authTokenPh: 'הדביקו את ה-token מה-JSON שהתקבל',
   authTokenBtn: 'כניסה עם טוקן',
@@ -950,6 +956,7 @@ function App() {
               <div className="authPanelCard">
                 <p className="authPanelLead">{authMode === 'login' ? he.loginLead : he.signupLead}</p>
                 <p className="authPanelSub">{he.authSubtitle}</p>
+                <p className="authCliText authApiHint">{he.authApiTarget(API_BASE_URL)}</p>
                 {message ? <p className="message authMessage">{message}</p> : null}
                 <div className="authSwitch">
                   <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
@@ -957,8 +964,10 @@ function App() {
                 </div>
                 <div className="authForm authCliBox">
                   <h3 className="authCliTitle">{he.authTcpTitle}</h3>
-                  <p className="authCliText">{he.authTcpExplain}</p>
+                  <pre className="authCliCmd"><code>{authServerCmd()}</code></pre>
+                  <p className="authCliText">{he.authTcpStep2}</p>
                   <pre className="authCliCmd"><code>{authCliCmd(authMode === 'signup' ? 'register' : 'login')}</code></pre>
+                  <p className="authCliText">{he.authTcpStep3}</p>
                 </div>
                 <form className="authForm" onSubmit={tokenSubmit}>
                   <label className="authField">

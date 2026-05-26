@@ -4,8 +4,14 @@
 # ===============================================================
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+# Load .env from repo root so local auth CLI uses the same DB/SECRET_KEY as Render.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # כתובת ה-DB נקראת מסביבת הייצור — ברירת מחדל: SQLite מקומי
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trempist.db")

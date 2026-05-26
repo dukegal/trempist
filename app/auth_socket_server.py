@@ -37,8 +37,7 @@ from app.database import SessionLocal
 from app.socket_protocol import AuthProtocol, ProtocolError
 from app.user_manager import LoginError, RegistrationError, UserManager
 
-# Server bind address — use 127.0.0.1 so only the local WebSocket proxy
-# can reach it; it is never exposed directly to the internet.
+# Server bind address — local TCP auth (127.0.0.1) or AUTH_SOCKET_HOST in production tooling.
 AUTH_HOST: str = os.getenv("AUTH_SOCKET_HOST", "127.0.0.1")
 AUTH_PORT: int = int(os.getenv("AUTH_SOCKET_PORT", "9000"))
 

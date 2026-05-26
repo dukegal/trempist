@@ -422,6 +422,12 @@ body {
   box-shadow: 0 10px 32px rgba(0, 163, 217, 0.4) !important;
 }
 
+.authAdvancedToggle {
+  margin: 10px 0 0;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
 .authCliBox {
   display: grid;
   gap: 12px;
@@ -440,6 +446,13 @@ body {
   font-size: 0.95rem;
   line-height: 1.55;
   color: var(--wz-slate);
+}
+
+.authApiHint {
+  font-weight: 600;
+  direction: ltr;
+  text-align: left;
+  word-break: break-all;
 }
 
 .authCliCmd {

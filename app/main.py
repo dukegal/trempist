@@ -17,7 +17,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import decode_token
-from app.auth_socket_server import AuthServer
 from app.database import Base, engine, get_db
 from app.models import CreditsLog, Match, MatchStatus, Rating, Ride, RideStatus, User
 from app.schemas import (
@@ -71,26 +70,6 @@ app = FastAPI(title="טרמפיסט — API")
 
 # TTL לבקשות ממתינות — ניתן לשינוי דרך משתני סביבה
 MATCH_REQUEST_TTL_HOURS = int(os.getenv("MATCH_REQUEST_TTL_HOURS", "24"))
-
-# שרת TCP גולמי להרשמה — מופעל יחד עם FastAPI כך שהקליינט
-# (app/auth_socket_client.py) יכול להתחבר ל-127.0.0.1:9000.
-_auth_server: AuthServer | None = None
-
-
-@app.on_event("startup")
-def _start_auth_socket_server() -> None:
-    global _auth_server
-    if _auth_server is None:
-        _auth_server = AuthServer()
-        _auth_server.start()
-
-
-@app.on_event("shutdown")
-def _stop_auth_socket_server() -> None:
-    global _auth_server
-    if _auth_server is not None:
-        _auth_server.stop()
-        _auth_server = None
 
 
 @app.exception_handler(RequestValidationError)
@@ -210,35 +189,6 @@ def get_current_user(
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
-# ---------------------------------------------------------------
-# אימות — הרשמה וכניסה
-#
-# הרשמה/כניסה מתבצעות אך ורק דרך שרת TCP גולמי (AuthServer, פורט 9000):
-#   python -m app.auth_socket_client register|login
-#
-# דפדפן אינו יכול לפתוח TCP גולמי — לאחר CLI מדביקים JWT בממשק.
-# FastAPI מאמת JWT בלבד (decode_token) ל-endpoints של נסיעות/התאמות.
-# ---------------------------------------------------------------
-
-
-@app.post("/auth/register")
-def register_disabled():
-    api_error(
-        status.HTTP_410_GONE,
-        "E410",
-        "הרשמה זמינה רק דרך שרת TCP: python -m app.auth_socket_client register",
-    )
-
-
-@app.post("/auth/login")
-def login_disabled():
-    api_error(
-        status.HTTP_410_GONE,
-        "E410",
-        "כניסה זמינה רק דרך שרת TCP: python -m app.auth_socket_client login",
-    )
 
 
 @app.get("/users/me", response_model=UserOut)
