@@ -9,17 +9,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const BRAND = 'TREMPIST'
 
-function authCliCmd(action) {
-  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
-  const base = isWindows ? 'py -m app.auth_socket_client' : 'python3 -m app.auth_socket_client'
-  return `${base} ${action}`
-}
-
-function authServerCmd() {
-  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
-  return isWindows ? '.\\tools\\run_local_auth.ps1' : 'py -m app.auth_socket_server'
-}
-
 // ---------------------------------------------------------------
 // אובייקט עברית — כל מחרוזות הממשק במקום אחד
 // הפרדה בין לוגיקה לתוכן — קל לשינוי/תרגום
@@ -28,15 +17,7 @@ const he = {
   requestFailed: 'הבקשה נכשלה',
   mapsLoadError: 'טעינת מפות Google נכשלה. בדקו את מפתח ה-API והגבלות הדומיין.',
   welcome: 'ברוכים הבאים',
-  authSubtitle: 'הרשמה והתחברות דרך קליינט TCP מקומי. העתיקו את ה-JWT לדפדפן — שאר האפליקציה ב-FastAPI.',
-  authTcpTitle: 'שלב 1 — הפעילו שרת אימות TCP מקומי',
-  authTcpStep2: 'שלב 2 — הריצו בטרמינל (מתיקיית הפרויקט, עם .env — אותם DATABASE_URL ו-SECRET_KEY כמו ב-Render):',
-  authTcpStep3: 'שלב 3 — העתיקו את token מה-JSON והדביקו למטה.',
-  authApiTarget: (url) => `שרת API בדפדפן: ${url}`,
-  authTokenLabel: 'JWT מהקליינט',
-  authTokenPh: 'הדביקו את ה-token מה-JSON שהתקבל',
-  authTokenBtn: 'כניסה עם טוקן',
-  authTokenInvalid: 'הטוקן לא תקין או פג תוקף',
+  authSubtitle: 'הרשמה והתחברות מאובטחות דרך השרת.',
   authBullet1: 'חיפוש נסיעות לפי מוצא ויעד על המפה',
   authBullet2: 'פרסום מקום פנוי ברכב בקלות',
   authBullet3: 'התאמה מהירה בין נוסעים לנהגים',
@@ -44,6 +25,8 @@ const he = {
   loginLead: 'כניסה לחשבון קיים',
   loginTab: 'התחברות',
   signupTab: 'הרשמה',
+  loginBtn: 'התחבר',
+  createAccount: 'יצירת חשבון',
   tagline: 'שיתוף טרמפים, ללא תשלום.',
   apiLabel: 'שרת',
   themeDark: 'מצב כהה',
@@ -378,7 +361,8 @@ function App() {
   const [authMode, setAuthMode] = useState('login')
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [pasteToken, setPasteToken] = useState('')
+  const [login, setLogin] = useState({ email: '', password: '' })
+  const [registerForm, setRegisterForm] = useState({ name: '', email: '', phone: '', password: '' })
   const [ride, setRide] = useState({ origin: '', destination: '', departure_time: '', seats_total: 1 })
   const [search, setSearch] = useState({
     origin: '',
@@ -633,32 +617,39 @@ function App() {
     drawRoute(rideMapInstance.current, rideDirectionsService, rideDirectionsRenderer, rideCoords)
   }, [mapsLoaded, activeTab, rideCoords])
 
-  async function tokenSubmit(event) {
+  async function registerSubmit(event) {
     event.preventDefault()
-    let jwt = pasteToken.trim()
-    if (!jwt) return
-    if (jwt.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(jwt)
-        jwt = parsed.token || parsed.access_token || jwt
-      } catch {
-        // use raw string
-      }
-    }
+    const displayName = registerForm.name.trim()
     await withLoading(async () => {
-      localStorage.setItem('token', jwt)
-      setToken(jwt)
-      setMe(null)
-      const profile = await loadProfile({ quiet: true })
-      if (!profile) {
-        localStorage.removeItem('token')
-        setToken('')
-        setMessage(he.authTokenInvalid)
-        return
+      try {
+        const data = await callApi('/auth/register', 'POST', registerForm)
+        localStorage.setItem('token', data.token)
+        setRegisterForm({ name: '', phone: '', email: '', password: '' })
+        setMe(null)
+        setToken(data.token)
+        setMessage(he.welcomeAfterRegister(displayName))
+        await loadProfile({ quiet: true })
+        await loadMyPublishedRides()
+      } catch (error) {
+        setMessage(error.message)
       }
-      setPasteToken('')
-      setMessage(he.loggedIn)
-      await loadMyPublishedRides()
+    })
+  }
+
+  async function loginSubmit(event) {
+    event.preventDefault()
+    await withLoading(async () => {
+      try {
+        const data = await callApi('/auth/login', 'POST', login)
+        localStorage.setItem('token', data.token)
+        setToken(data.token)
+        setMe(null)
+        setMessage(he.loggedIn)
+        await loadProfile({ quiet: true })
+        await loadMyPublishedRides()
+      } catch (error) {
+        setMessage(error.message)
+      }
     })
   }
 
@@ -956,33 +947,44 @@ function App() {
               <div className="authPanelCard">
                 <p className="authPanelLead">{authMode === 'login' ? he.loginLead : he.signupLead}</p>
                 <p className="authPanelSub">{he.authSubtitle}</p>
-                <p className="authCliText authApiHint">{he.authApiTarget(API_BASE_URL)}</p>
                 {message ? <p className="message authMessage">{message}</p> : null}
                 <div className="authSwitch">
                   <button type="button" className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => setAuthMode('login')}>{he.loginTab}</button>
                   <button type="button" className={authMode === 'signup' ? 'tab active' : 'tab'} onClick={() => setAuthMode('signup')}>{he.signupTab}</button>
                 </div>
-                <div className="authForm authCliBox">
-                  <h3 className="authCliTitle">{he.authTcpTitle}</h3>
-                  <pre className="authCliCmd"><code>{authServerCmd()}</code></pre>
-                  <p className="authCliText">{he.authTcpStep2}</p>
-                  <pre className="authCliCmd"><code>{authCliCmd(authMode === 'signup' ? 'register' : 'login')}</code></pre>
-                  <p className="authCliText">{he.authTcpStep3}</p>
-                </div>
-                <form className="authForm" onSubmit={tokenSubmit}>
-                  <label className="authField">
-                    <span className="authLabel">{he.authTokenLabel}</span>
-                    <textarea
-                      className="authTokenInput"
-                      rows={3}
-                      value={pasteToken}
-                      onChange={(e) => setPasteToken(e.target.value)}
-                      placeholder={he.authTokenPh}
-                      required
-                    />
-                  </label>
-                  <button type="submit" className="authSubmit" disabled={loading}>{he.authTokenBtn}</button>
-                </form>
+                {authMode === 'login' ? (
+                  <form className="authForm" onSubmit={loginSubmit}>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelEmail}</span>
+                      <input type="email" autoComplete="email" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.password}</span>
+                      <input type="password" autoComplete="current-password" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} required />
+                    </label>
+                    <button type="submit" className="authSubmit" disabled={loading}>{he.loginBtn}</button>
+                  </form>
+                ) : (
+                  <form className="authForm" onSubmit={registerSubmit}>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelName}</span>
+                      <input autoComplete="name" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} required minLength={2} />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.phone}</span>
+                      <input type="tel" autoComplete="tel" value={registerForm.phone} onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.labelEmail}</span>
+                      <input type="email" autoComplete="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} required />
+                    </label>
+                    <label className="authField">
+                      <span className="authLabel">{he.password}</span>
+                      <input type="password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} required minLength={6} />
+                    </label>
+                    <button type="submit" className="authSubmit" disabled={loading}>{he.createAccount}</button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

@@ -17,15 +17,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import decode_token
+from app.auth_bridge import AuthBridgeError, AuthBridgeUnavailable, login_user, register_user
 from app.database import Base, engine, get_db
 from app.models import CreditsLog, Match, MatchStatus, Rating, Ride, RideStatus, User
 from app.schemas import (
+    LoginIn,
     MatchConfirmIn,
     MatchRequestIn,
     RatingIn,
+    RegisterIn,
     RideCreateIn,
     RideOut,
     RideSearchIn,
+    TokenOut,
     UserOut,
 )
 
@@ -189,6 +193,32 @@ def get_current_user(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------
+# Auth — HTTPS entrypoint; user management runs on TCP auth service
+# ---------------------------------------------------------------
+
+@app.post("/auth/register", response_model=TokenOut)
+def register(payload: RegisterIn):
+    try:
+        result = register_user(payload.name, payload.email, payload.phone, payload.password)
+    except AuthBridgeUnavailable:
+        api_error(status.HTTP_503_SERVICE_UNAVAILABLE, "E503", "שרת האימות אינו זמין כרגע")
+    except AuthBridgeError as exc:
+        api_error(status.HTTP_400_BAD_REQUEST, "E400", str(exc))
+    return TokenOut(token=result["token"], user_id=result["user_id"])
+
+
+@app.post("/auth/login", response_model=TokenOut)
+def login(payload: LoginIn):
+    try:
+        result = login_user(payload.email, payload.password)
+    except AuthBridgeUnavailable:
+        api_error(status.HTTP_503_SERVICE_UNAVAILABLE, "E503", "שרת האימות אינו זמין כרגע")
+    except AuthBridgeError as exc:
+        api_error(status.HTTP_401_UNAUTHORIZED, "E401", str(exc))
+    return TokenOut(token=result["token"], user_id=result["user_id"])
 
 
 @app.get("/users/me", response_model=UserOut)

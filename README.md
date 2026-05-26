@@ -23,31 +23,36 @@ Minimal FastAPI backend scaffold based on the provided design and guidelines.
 3. Open docs:
    - http://127.0.0.1:8000/docs
 
-## Local auth (TCP client → server) → paste JWT in browser
+## Auth architecture (Render)
 
-Registration and login are **not** in FastAPI. Use the local TCP auth stack:
+```
+Browser  --HTTPS-->  trempist-api (FastAPI)  --TCP-->  trempist-auth (private service)
+```
 
-1. `.env` in repo root with the **same** `DATABASE_URL` and `SECRET_KEY` as Render (Supabase Postgres).
-2. Terminal A — TCP auth server only (not bundled with FastAPI):
+- **Private service:** `services/auth-server/` — deploy as Render Private Service (see [services/auth-server/README.md](services/auth-server/README.md))
+- **API env:** `AUTH_SOCKET_HOST=trempist-auth`, `AUTH_SOCKET_PORT=10000`
+- **Browser:** register/login forms → `POST /auth/register`, `POST /auth/login`
 
-   ```powershell
-   .\tools\run_local_auth.ps1
-   ```
+### Local development
 
-   Or: `py -m app.auth_socket_server`
+Terminal A — auth server:
 
-3. Terminal B — register or login:
+```powershell
+.\services\auth-server\start.ps1
+```
 
-   ```powershell
-   py -m app.auth_socket_client register
-   py -m app.auth_socket_client login
-   ```
+Terminal B — API:
 
-4. Copy `token` from the JSON output → paste in the web login screen.
+```powershell
+py -m uvicorn app.main:app --reload
+```
 
-5. Frontend `.env`: `VITE_API_BASE_URL=https://your-trempist-api.onrender.com`
+Terminal C — frontend:
 
-The auth server stores users in Supabase (via `DATABASE_URL`) using `hash_password` and returns a JWT. Render FastAPI only validates that JWT for rides/matches — no local `uvicorn` required for the app itself.
+```powershell
+cd frontend
+npm run dev
+```
 
 ## Deploy on Render + Supabase
 
@@ -71,11 +76,8 @@ The auth server stores users in Supabase (via `DATABASE_URL`) using `hash_passwo
 
 ## Implemented MVP endpoints
 
-- **User registration / login:** local TCP client → TCP auth server (`py -m app.auth_socket_server`, port 9000).
-  - Client: `py -m app.auth_socket_client register|login`
-  - Server writes to Supabase/Postgres (`hash_password` + JWT); paste token in browser
-  - **No** HTTP auth endpoints on FastAPI; auth server is **not** started by FastAPI
-- `GET /users/me` (JWT validation only)
+- **User registration / login:** HTTPS `POST /auth/register`, `POST /auth/login` → FastAPI proxies over TCP to private auth service
+- `GET /users/me` (JWT validation)
 - `POST /rides`
 - `POST /rides/search`
 - `GET /rides/mine`

@@ -218,8 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         indent=2,
     ))
     print(
-        "\nהעתיקו את token לדפדפן (הדבקה במסך הכניסה). "
-        "ודאו ש-.env המקומי משתמש באותם DATABASE_URL ו-SECRET_KEY כמו ב-Render.",
+        "\nToken ready — use in API requests as Authorization: Bearer <token>",
         file=sys.stderr,
     )
     return 0

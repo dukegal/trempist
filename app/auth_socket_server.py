@@ -37,9 +37,9 @@ from app.database import SessionLocal
 from app.socket_protocol import AuthProtocol, ProtocolError
 from app.user_manager import LoginError, RegistrationError, UserManager
 
-# Server bind address — local TCP auth (127.0.0.1) or AUTH_SOCKET_HOST in production tooling.
+# Bind address/port — use 0.0.0.0 + $PORT on Render private service; 127.0.0.1:9000 locally.
 AUTH_HOST: str = os.getenv("AUTH_SOCKET_HOST", "127.0.0.1")
-AUTH_PORT: int = int(os.getenv("AUTH_SOCKET_PORT", "9000"))
+AUTH_PORT: int = int(os.getenv("AUTH_SOCKET_PORT") or os.getenv("PORT") or "9000")
 
 
 # ── ClientHandler ─────────────────────────────────────────────────────────────
